@@ -1,0 +1,34 @@
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# PyCharm
+.idea/
+
+# Frontend
+node_modules/
+dist/
+
+# GTFS data
+data/raw/
+*.zip
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Private AI context
+personal-context.md
