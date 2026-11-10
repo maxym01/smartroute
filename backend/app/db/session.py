@@ -1,8 +1,9 @@
 """Silnik SQLAlchemy, fabryka sesji i zależność FastAPI ``get_db``."""
 
 from collections.abc import Iterator
+from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -18,7 +19,20 @@ def build_engine(database_url: str, *, echo: bool = False) -> Engine:
         kwargs["connect_args"] = {"check_same_thread": False}
         if url.database in (None, "", ":memory:"):
             kwargs["poolclass"] = StaticPool
+        engine = create_engine(url, **kwargs)
+        event.listen(engine, "connect", _register_unicode_lower)
+        return engine
     return create_engine(url, **kwargs)
+
+
+def _register_unicode_lower(dbapi_connection: Any, _: Any) -> None:
+    # Wbudowane lower() w SQLite obsługuje tylko ASCII — nadpisujemy je, by "Ł" == "ł".
+    dbapi_connection.create_function(
+        "lower",
+        1,
+        lambda value: value.casefold() if isinstance(value, str) else value,
+        deterministic=True,
+    )
 
 
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:

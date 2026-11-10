@@ -12,6 +12,7 @@ __pycache__/
 
 # SQLite
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
 
