@@ -32,3 +32,11 @@ Thumbs.db
 
 # Private AI context
 personal-context.md
+
+# Test coverage and pytest
+.coverage
+.coverage.*
+htmlcov/
+
+# Python build artifacts
+*.egg-info/
