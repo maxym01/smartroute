@@ -1,17 +1,12 @@
 from datetime import datetime
-from enum import StrEnum
 
 from sqlalchemy import DateTime, Enum, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.enums import TripPriority
 from app.db.base import Base
 
-
-class TripPriority(StrEnum):
-    FASTEST = "fastest"
-    CHEAPEST = "cheapest"
-    GREENEST = "greenest"
-    BALANCED = "balanced"
+__all__ = ["Trip", "TripPriority"]
 
 
 class Trip(Base):

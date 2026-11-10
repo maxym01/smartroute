@@ -54,6 +54,24 @@ def test_invalid_environment_is_rejected() -> None:
         Settings(_env_file=None, environment="staging")
 
 
+def test_transport_params_overridable_with_nested_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TRANSPORT__CAR__FUEL_PRICE_PLN_PER_L", "7.25")
+    monkeypatch.setenv("TRANSPORT__BIKE__MAX_DISTANCE_KM", "25")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.transport.car.fuel_price_pln_per_l == 7.25
+    assert settings.transport.bike.max_distance_km == 25
+    assert settings.transport.car.avg_speed_kmh == 40  # pozostałe bez zmian
+
+
+def test_transport_params_from_env_are_validated(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TRANSPORT__PUBLIC_TRANSPORT__AVG_SPEED_KMH", "0")
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
 def test_get_settings_is_cached() -> None:
     assert get_settings() is get_settings()
 

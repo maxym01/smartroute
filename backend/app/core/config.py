@@ -1,14 +1,17 @@
 """Konfiguracja aplikacji oparta na pydantic-settings.
 
 Wartości można nadpisać zmiennymi środowiskowymi lub plikiem ``.env``.
-Parametry transportu dojdą w kolejnych etapach.
+Parametry modelu transportu (``transport``) są opisane w ``app.core.transport_params``;
+zagnieżdżone pola nadpisuje się z separatorem ``__``, np. ``TRANSPORT__BIKE__MAX_DISTANCE_KM=25``.
 """
 
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from app.core.transport_params import TransportSettings
 
 API_V1_PREFIX = "/api/v1"
 
@@ -17,9 +20,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_nested_delimiter="__",
         extra="ignore",
         case_sensitive=False,
     )
+
+    transport: TransportSettings = Field(default_factory=TransportSettings)
 
     app_name: str = "SmartRoute AI"
     app_version: str = "0.1.0"
