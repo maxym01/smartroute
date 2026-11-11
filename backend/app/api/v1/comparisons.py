@@ -6,20 +6,32 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.enums import TripPriority
 from app.core.exceptions import NotFoundError
+from app.db.gtfs_session import get_gtfs_db
 from app.db.session import get_db
+from app.repositories.gtfs_repository import GtfsRepository
 from app.repositories.trip_repository import TripRepository
 from app.schemas.comparison import ComparisonResponse
 from app.services.comparison_service import ComparisonService
+from app.services.gtfs.schedule_service import ScheduleService
 from app.services.transport import TripInput
+from app.services.transport.gtfs_transit import GtfsTransitTimeProvider
 
 router = APIRouter(tags=["comparisons"])
 
 
 def get_comparison_service(
     settings: Annotated[Settings, Depends(get_settings)],
+    gtfs_db: Annotated[Session | None, Depends(get_gtfs_db)],
 ) -> ComparisonService:
-    # Punkt wpięcia dla GTFS: tu zostanie przekazany transit_time_provider.
-    return ComparisonService.from_settings(settings.transport)
+    # Rozkład GTFS jest opcjonalny: bez importu (gtfs_db=None) dostawca zwraca szacunek
+    # parametryczny, a podróże bez przystanków i daty liczone są jak dotychczas.
+    schedule = ScheduleService(GtfsRepository(gtfs_db)) if gtfs_db is not None else None
+    provider = GtfsTransitTimeProvider(
+        schedule,
+        settings.transport.public_transport,
+        window_min=settings.gtfs_search_window_min,
+    )
+    return ComparisonService.from_settings(settings.transport, provider)
 
 
 @router.get(
@@ -48,6 +60,9 @@ def compare_trip(
             allow_bike=trip.allow_bike,
             origin=trip.origin,
             destination=trip.destination,
+            origin_stop_id=trip.origin_stop_id,
+            destination_stop_id=trip.destination_stop_id,
+            departure_at=trip.departure_at,
         ),
         priority or trip.priority,
     )

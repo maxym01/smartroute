@@ -1,6 +1,7 @@
 """Wspólne typy kalkulatorów transportu. Moduł nie zależy od FastAPI ani od bazy danych."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Protocol
 
 from app.core.enums import DataSource, TransportMode
@@ -28,6 +29,11 @@ class TripInput:
     allow_bike: bool = True
     origin: str | None = None
     destination: str | None = None
+    # Opcjonalne dane do rozkładu GTFS. ID przystanku to identyfikator z feedu (stop_id),
+    # a nie tekst origin/destination — nazw miejsc nie zamieniamy na przystanki.
+    origin_stop_id: str | None = None
+    destination_stop_id: str | None = None
+    departure_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not self.distance_km > 0:

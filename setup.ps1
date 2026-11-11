@@ -127,6 +127,7 @@ if (Test-Path $EnvFile) {
 
 Write-Host ''
 Write-Host 'Gotowe. Uruchom backend poleceniem:  .\run.ps1' -ForegroundColor Green
+Write-Host 'Rozkład GTFS ZTM Gdańsk (opcjonalnie):  .\import-gtfs.ps1' -ForegroundColor Green
 if (-not $NoDev) {
     Write-Host 'Testy:  cd backend; ..\.venv\Scripts\python.exe -m pytest' -ForegroundColor Green
 }

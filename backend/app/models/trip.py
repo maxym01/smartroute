@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.enums import TripPriority
 from app.db.base import Base
+from app.db.types import UTCDateTime
 
 __all__ = ["Trip", "TripPriority"]
 
@@ -32,6 +33,11 @@ class Trip(Base):
     has_car: Mapped[bool] = mapped_column(default=True)
     allow_bike: Mapped[bool] = mapped_column(default=True)
     notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    # Opcjonalne dane rozkładowe (GTFS). Kolumny nullable — dodawane do istniejących baz
+    # przez app.db.migrations bez utraty danych.
+    origin_stop_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    destination_stop_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    departure_at: Mapped[datetime | None] = mapped_column(UTCDateTime, default=None)
     # SQLite CURRENT_TIMESTAMP zwraca czas UTC (bez strefy) — strefę dokłada schemat TripRead.
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -14,6 +14,18 @@ class NotFoundError(Exception):
         super().__init__(f"{resource} o id={resource_id} nie istnieje")
 
 
+class UnknownStopError(NotFoundError):
+    def __init__(self, stop_id: str) -> None:
+        super().__init__("Przystanek", stop_id)
+
+
+class GtfsNotImportedError(Exception):
+    def __init__(self) -> None:
+        super().__init__(
+            "Rozkład GTFS nie został zaimportowany. Uruchom: python -m app.cli.gtfs import"
+        )
+
+
 def _serialize_validation_errors(errors: Any) -> list[dict[str, Any]]:
     # Tylko pola serializowalne — ``ctx`` może zawierać obiekty wyjątków.
     return [
@@ -41,6 +53,14 @@ async def validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def gtfs_not_imported_handler(_: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"detail": str(exc), "code": "gtfs_not_imported"},
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, not_found_handler)
+    app.add_exception_handler(GtfsNotImportedError, gtfs_not_imported_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)

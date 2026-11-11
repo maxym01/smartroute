@@ -13,6 +13,8 @@ dependencies = [
     "sqlalchemy>=2.0,<2.1",
     "pydantic>=2.7,<3.0",
     "pydantic-settings>=2.7,<3.0",
+    # Baza stref czasowych dla zoneinfo (Windows nie ma systemowej): Europe/Warsaw dla GTFS.
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]

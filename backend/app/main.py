@@ -16,14 +16,17 @@ from app.core.config import API_V1_PREFIX, Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.db import session as db_session
 from app.db.base import Base
+from app.db.migrations import upgrade_schema
 
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Alembic poza zakresem MVP — tabele tworzymy przy starcie.
+    # Alembic poza zakresem MVP — tabele tworzymy przy starcie, a nowe kolumny nullable
+    # dodaje idempotentna migracja (bez utraty danych).
     Base.metadata.create_all(bind=app.state.engine)
+    upgrade_schema(app.state.engine)
     yield
 
 
