@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -15,13 +15,19 @@ from app.services.comparison_service import ComparisonService
 from app.services.gtfs.schedule_service import ScheduleService
 from app.services.transport import TripInput
 from app.services.transport.gtfs_transit import GtfsTransitTimeProvider
+from app.services.weather import WeatherbitClient, WeatherService
 
 router = APIRouter(tags=["comparisons"])
+
+
+def get_weather_client(request: Request) -> WeatherbitClient | None:
+    return getattr(request.app.state, "weather_client", None)
 
 
 def get_comparison_service(
     settings: Annotated[Settings, Depends(get_settings)],
     gtfs_db: Annotated[Session | None, Depends(get_gtfs_db)],
+    weather_client: Annotated[WeatherbitClient | None, Depends(get_weather_client)],
 ) -> ComparisonService:
     # Rozkład GTFS jest opcjonalny: bez importu (gtfs_db=None) dostawca zwraca szacunek
     # parametryczny, a podróże bez przystanków i daty liczone są jak dotychczas.
@@ -31,7 +37,13 @@ def get_comparison_service(
         settings.transport.public_transport,
         window_min=settings.gtfs_search_window_min,
     )
-    return ComparisonService.from_settings(settings.transport, provider)
+    # Pogoda: lokalizacja wyłącznie ze współrzędnych przystanku GTFS; każdy błąd = brak korekty.
+    weather = WeatherService(
+        weather_client,
+        GtfsRepository(gtfs_db) if gtfs_db is not None else None,
+        max_lead_min=settings.weather_max_lead_min,
+    )
+    return ComparisonService.from_settings(settings.transport, provider, weather)
 
 
 @router.get(

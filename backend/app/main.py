@@ -17,6 +17,7 @@ from app.core.exceptions import register_exception_handlers
 from app.db import session as db_session
 from app.db.base import Base
 from app.db.migrations import upgrade_schema
+from app.services.weather import WeatherbitClient
 
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
@@ -30,6 +31,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+def build_weather_client(settings: Settings) -> WeatherbitClient:
+    key = settings.weatherbit_api_key
+    return WeatherbitClient(
+        key.get_secret_value() if key else None,
+        base_url=settings.weatherbit_base_url,
+        timeout_s=settings.weather_timeout_s,
+        cache_ttl_s=settings.weather_cache_ttl_s,
+        error_cooldown_s=settings.weather_error_cooldown_s,
+    )
+
+
 def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
     settings = settings or get_settings()
 
@@ -41,6 +53,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     )
     app.state.settings = settings
     app.state.engine = engine or db_session.engine
+    # Jeden klient na aplikację: wspólny cache TTL i cooldown po błędach dla wszystkich żądań.
+    app.state.weather_client = build_weather_client(settings)
 
     app.add_middleware(
         CORSMiddleware,

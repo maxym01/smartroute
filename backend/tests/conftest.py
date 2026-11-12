@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from app.api.v1.comparisons import get_weather_client
 from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.db.gtfs_session import build_gtfs_engine, get_gtfs_db
@@ -28,6 +29,8 @@ def test_settings() -> Settings:
         environment="test",
         database_url=TEST_DATABASE_URL,
         cors_origins=TEST_CORS_ORIGINS,
+        # Jawnie None: klucz ze zmiennej środowiskowej nie może włączyć sieci w testach.
+        weatherbit_api_key=None,
     )
 
 
@@ -66,6 +69,8 @@ def app(test_settings: Settings, engine: Engine) -> FastAPI:
     # Domyślnie testy nie widzą żadnego rozkładu (nigdy lokalnego gtfs.db). Testy GTFS
     # podmieniają tę zależność na bazę zbudowaną z syntetycznego ZIP-a.
     app.dependency_overrides[get_gtfs_db] = lambda: None
+    # Pogoda domyślnie wyłączona; testy pogody podmieniają klienta na mock bez sieci.
+    app.dependency_overrides[get_weather_client] = lambda: None
     return app
 
 

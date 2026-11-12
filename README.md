@@ -22,6 +22,7 @@ według wybranego priorytetu.
 - [Konfiguracja](#konfiguracja)
 - [Baza danych](#baza-danych)
 - [Rozkład GTFS (ZTM Gdańsk)](#rozkład-gtfs-ztm-gdańsk)
+- [Pogoda bieżąca (Weatherbit)](#pogoda-bieżąca-weatherbit)
 - [API: przykładowe żądania](#api-przykładowe-żądania)
 - [Testy i jakość kodu](#testy-i-jakość-kodu)
 - [Struktura projektu](#struktura-projektu)
@@ -49,6 +50,9 @@ według wybranego priorytetu.
   - bezpośrednie połączenia według kalendarza kursowania (`GET /api/v1/connections`),
   - opcjonalne pola podróży `origin_stop_id`, `destination_stop_id` i `departure_at`; gdy są
     ustawione, porównanie używa czasu z rozkładu (`data_source: "gtfs_schedule"`).
+- **Pogoda bieżąca Weatherbit** ([szczegóły](#pogoda-bieżąca-weatherbit)): opcjonalna,
+  jawna korekta komfortu i czasu roweru dla podróży „teraz”, z cache i bezpiecznym
+  fallbackiem.
 - **Health check** (`/api/v1/health`) ze sprawdzeniem połączenia z bazą.
 - **Spójny format błędów** `{"detail": ..., "code": "not_found" | "validation_error" | "gtfs_not_imported"}`.
 - **CORS** skonfigurowany pod przyszły frontend (domyślnie Vite dev server).
@@ -173,6 +177,11 @@ mają pierwszeństwo.
 | `GTFS_FEED_URL` | oficjalny feed ZTM Gdańsk    | Domyślne źródło importu                    |
 | `GTFS_SEARCH_WINDOW_MIN` | `180`               | Okno szukania połączenia przy porównaniu [min] |
 | `GTFS_MAX_DOWNLOAD_MB` | `200`                 | Limit rozmiaru pobieranego ZIP-a           |
+| `WEATHERBIT_API_KEY` | brak (wyłączone)       | Klucz Weatherbit — tylko w `.env` / env    |
+| `WEATHER_TIMEOUT_S` | `5`                     | Timeout zapytania HTTP [s]                 |
+| `WEATHER_CACHE_TTL_S` | `1800`                | Cache odczytu na lokalizację [s]           |
+| `WEATHER_ERROR_COOLDOWN_S` | `300`            | Przerwa w zapytaniach po błędzie / 429 [s] |
+| `WEATHER_MAX_LEAD_MIN` | `120`                | Maks. czas do odjazdu, by użyć pogody [min] |
 
 Pełna lista parametrów modelu z jednostkami jest w [`backend/.env.example`](backend/.env.example)
 i [`backend/app/core/transport_params.py`](backend/app/core/transport_params.py).
@@ -273,6 +282,128 @@ na przystanek. Wariant „Komunikacja miejska” w `GET /trips/{id}/compare`:
   brakujące pole albo nie zaimportowany rozkład.
 - Podróże bez pól GTFS są liczone dokładnie tak jak wcześniej. Koszt biletu i CO₂ zawsze
   pochodzą z parametrów modelu.
+
+## Pogoda bieżąca (Weatherbit)
+
+Opcjonalna korekta wariantu „Rower” na podstawie **bieżącej** pogody z
+[Weatherbit Current Weather API](https://www.weatherbit.io/api/weather-current)
+(`GET /v2.0/current`, darmowy plan). Prognozy i płatne funkcje nie są używane.
+
+### Konfiguracja
+
+1. Załóż konto na weatherbit.io i skopiuj klucz API (aktywacja nowego klucza może chwilę potrwać,
+   do tego czasu API odpowiada błędem 401/403).
+2. Wpisz go **wyłącznie** w `backend/.env` (plik jest w `.gitignore`) albo w zmiennej
+   środowiskowej:
+
+   ```
+   WEATHERBIT_API_KEY=twoj_klucz
+   ```
+
+3. Uruchom ponownie backend (`.\run.ps1`). Bez klucza integracja jest wyłączona, a porównanie
+   działa jak wcześniej (`weather.status: "disabled"`).
+
+Klucz jest typu `SecretStr` (maskowany w `repr`), nie trafia do logów ani komunikatów błędów,
+a wyjątki HTTP, których URL zawiera klucz, nie są dołączane do tracebacków. Pozostałe ustawienia
+(`WEATHER_TIMEOUT_S`, `WEATHER_CACHE_TTL_S`, `WEATHER_ERROR_COOLDOWN_S`, `WEATHER_MAX_LEAD_MIN`)
+opisuje [Konfiguracja](#konfiguracja).
+
+### Kiedy pogoda jest uwzględniana
+
+Korekta jest stosowana tylko wtedy, gdy spełnione są wszystkie warunki. Inaczej `weather.status`
+podaje powód, a `weather.explanation` go wyjaśnia:
+
+| Warunek | Status przy niespełnieniu |
+|---|---|
+| Rower jest dostępny dla podróży | `not_applicable` |
+| Ustawiono `WEATHERBIT_API_KEY` | `disabled` |
+| `departure_at` jest od 60 min wstecz do `WEATHER_MAX_LEAD_MIN` (120 min) w przód od teraz | `out_of_time_window` |
+| Podróż ma `origin_stop_id`, a przystanek GTFS ma współrzędne | `no_location` |
+| Weatherbit odpowiedział (z cache lub z API) | `unavailable` |
+
+- **Lokalizacja** to współrzędne przystanku startowego z rozkładu GTFS. Tekstowe `origin`
+  (np. „Gdańsk”) nigdy nie jest zamieniane na współrzędne.
+- **Pogoda bieżąca to nie prognoza** (`weather.is_forecast: false`). Dla podróży za kilka godzin
+  lub dni korekta jest pomijana.
+- **Błędy nie psują porównania.** Timeout, HTTP 429, odrzucony klucz, brak internetu i niepoprawna
+  odpowiedź dają `status: "unavailable"`, a wynik jest identyczny jak bez pogody.
+
+### Limit zapytań
+
+- Timeout HTTP: 5 s.
+- Cache w pamięci procesu: 30 min na komórkę siatki 0,1° (kilka km). Zapytanie wysyłane jest dla
+  środka komórki, więc wszystkie przystanki w okolicy dzielą jeden odczyt.
+- Po każdym błędzie klient przez 5 min nie odpytuje API (dla żadnej lokalizacji).
+- Gdy rower jest niedostępny, termin jest poza oknem albo brak lokalizacji, zapytanie w ogóle
+  nie jest wysyłane.
+
+Jednostki: zapytanie zawsze ma `units=M`, czyli temperatura w °C, opad (`precip`, `snow`) w mm/h
+i wiatr (`wind_spd`) w m/s. Wiatr jest przeliczany na km/h (× 3,6).
+
+### Heurystyki komfortu roweru
+
+Reguły są deterministyczne ([`app/services/weather/adjustment.py`](backend/app/services/weather/adjustment.py)),
+a progi są przyjętymi założeniami MVP:
+
+| Czynnik | Komfort `reduced` | Komfort `poor` |
+|---|---|---|
+| Opad | ≥ 0,2 mm/h | ≥ 2,5 mm/h |
+| Burza, śnieg, marznący deszcz (kody 2xx, 511, 6xx) | — | zawsze |
+| Wiatr | ≥ 25 km/h (czas roweru +10%) | ≥ 40 km/h (czas roweru +20%) |
+| Temperatura | ≤ 3 °C lub ≥ 28 °C | ≤ -5 °C lub ≥ 33 °C |
+
+Wynikowy komfort (`good` / `reduced` / `poor`) to najgorszy z czynników.
+
+**Wpływ na rekomendację:**
+
+- **Wagi czasu, kosztu i CO₂ się nie zmieniają.** Pogoda nie jest ukrytą czwartą metryką.
+- **Wiatr** wydłuża szacowany czas roweru. Dlatego zmienia wynik `fastest` i `balanced` tak samo
+  jak każda inna zmiana czasu i jest opisany w `assumptions`.
+- **Komfort `poor`** uruchamia jawną regułę (`scoring.comfort_rule`): rower trafia na koniec
+  rankingu przy każdym priorytecie (`score.weather_demoted: true`), o ile istnieje inny dostępny
+  wariant. Wśród pozostałych wariantów priorytet działa bez zmian. Na przykład `greenest` w ulewie
+  wybiera najniższą emisję spośród wariantów o akceptowalnym komforcie, a uzasadnienie mówi to
+  wprost. `balanced_score` i znormalizowane metryki roweru pozostają niezmienione.
+- **Komfort `reduced`** nie zmienia rankingu, tylko dodaje ostrzeżenie do uzasadnienia.
+- **Samochód i komunikacja miejska** nie są korygowane. Godziny odjazdów GTFS pozostają
+  rozkładowe, bez symulowania korków i opóźnień.
+
+### Odpowiedź API
+
+`GET /trips/{id}/compare` ma nowe, opcjonalne pola. Dotychczasowe pola nie zmieniły się:
+
+- `weather`: `status`, `adjustment_applied`, `explanation`, `is_forecast`, `location`,
+  `conditions` i `adjustment`,
+- `variants[].comfort_level`: `null`, gdy komfortu nie oceniano,
+- `variants[].score.weather_demoted`,
+- `scoring.comfort_rule`.
+
+Fragment rzeczywistej odpowiedzi z testu offline z mockiem ulewy (priorytet `greenest`, przystanek
+syntetyczny):
+
+```json
+"weather": {
+  "status": "applied",
+  "adjustment_applied": true,
+  "explanation": "Uwzględniono bieżącą pogodę Weatherbit w okolicy przystanku Dworzec Główny 01 (tylko komfort i czas roweru). Komfort roweru: niski (intensywny opad 4,0 mm/h).",
+  "is_forecast": false,
+  "location": {"stop_id": "A1", "stop_name": "Dworzec Główny 01", "lat": 54.355, "lon": 18.645},
+  "conditions": {
+    "source": "weatherbit_current",
+    "observed_at": "2026-11-11T10:20:00Z",
+    "temperature_c": 12.0,
+    "precipitation_mm_h": 4.0,
+    "snowfall_mm_h": 0.0,
+    "wind_speed_kmh": 10.8,
+    "description": "Heavy rain"
+  },
+  "adjustment": {"mode": "bike", "comfort_level": "poor", "duration_factor": 1.0, "reasons": ["intensywny opad 4,0 mm/h"]}
+},
+"recommendation": {
+  "mode": "public_transport",
+  "explanation": "Komunikacja miejska ma najniższą szacowaną emisję spośród wariantów o akceptowalnym komforcie pogodowym: ok. 0,20 kg CO₂. (…) Wariant „Rower” przesunięto na koniec rankingu: niski komfort przy bieżącej pogodzie. Wszystkie wartości są szacunkowe."
+}
+```
 
 ## API: przykładowe żądania
 
@@ -534,7 +665,8 @@ smartroute-ai/
     │   ├── repositories/      # dostęp do danych (podróże, rozkład)
     │   ├── services/
     │   │   ├── gtfs/          # importer, czas GTFS, wyszukiwanie połączeń
-    │   │   └── transport/     # kalkulatory, GtfsTransitTimeProvider
+    │   │   ├── transport/     # kalkulatory, GtfsTransitTimeProvider
+    │   │   └── weather/       # klient Weatherbit (cache), ocena i korekta pogodowa
     │   └── api/v1/            # endpointy
     └── tests/
         ├── unit/
@@ -556,6 +688,15 @@ FastAPI ani bazy danych.
   - `shapes.txt` nie jest importowany,
   - przy imporcie SQLite przez chwilę potrzebuje około 2× rozmiaru bazy na dysku
     (stare i nowe dane do COMMIT).
+- **Pogoda — ograniczony zakres:**
+  - tylko pogoda bieżąca, bez prognozy, więc działa tylko dla podróży w ciągu ok. 2 h,
+  - lokalizacja wyłącznie z przystanku startowego GTFS, a pogoda w miejscu docelowym
+    nie jest sprawdzana,
+  - progi komfortu to założenia, a kierunek wiatru względem trasy jest nieznany,
+  - cache jest w pamięci procesu, więc znika po restarcie i nie jest współdzielony
+    między workerami,
+  - integracja nie była jeszcze sprawdzona na prawdziwym API, bo klucz jest w trakcie
+    aktywacji; testy używają mockowanych odpowiedzi w formacie z dokumentacji.
 - **Dystans podaje użytkownik w km.** Brak geokodowania i wyznaczania tras, a punkt startu i cel to
   zwykły tekst.
 - **Brak uwierzytelniania.** Jeden anonimowy użytkownik, a dane są wspólne dla wszystkich klientów API.

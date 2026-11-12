@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
-from app.core.enums import DataSource, TransportMode
+from app.core.enums import ComfortLevel, DataSource, TransportMode
 
 MODE_LABELS: dict[TransportMode, str] = {
     TransportMode.CAR: "Samochód",
@@ -56,6 +56,8 @@ class ModeEstimate:
     co2_per_passenger_kg: float
     data_source: DataSource
     assumptions: tuple[str, ...] = field(default_factory=tuple)
+    # Ustawiany tylko przez korektę pogodową (obecnie dla roweru); None = nie oceniano.
+    comfort_level: ComfortLevel | None = None
 
     @property
     def label(self) -> str:

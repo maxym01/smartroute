@@ -20,6 +20,11 @@ Algorytm
    zaokrąglony do 4 miejsc, i wybiera najniższy wynik.
 5. Pełny remis rozstrzyga stała kolejność: rower → komunikacja miejska → samochód
    (preferencja dla wariantów tańszych w emisji). Wynik jest więc zawsze deterministyczny.
+6. Reguła komfortu (tylko gdy porównanie uwzględniło bieżącą pogodę): wariant z komfortem
+   ``poor`` trafia na koniec rankingu, o ile istnieje inny dostępny wariant. To osobny, jawny
+   krok przed kryteriami z p. 3–4 — wagi i normalizacja czasu/kosztu/CO₂ się nie zmieniają,
+   a wariant zachowuje swój ``balanced_score`` (oznaczony ``weather_demoted``). Komfort
+   ``reduced`` nie zmienia rankingu, tylko dodaje ostrzeżenie do uzasadnienia.
 
 Porównania działają na wartościach zaokrąglonych tak, jak zwraca je API (patrz ``base.py``).
 """
@@ -29,7 +34,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
-from app.core.enums import TransportMode, TripPriority
+from app.core.enums import ComfortLevel, TransportMode, TripPriority
 from app.services.transport.base import MODE_LABELS, ModeEstimate, fmt_number
 
 Metric = Literal["duration", "cost", "co2"]
@@ -75,6 +80,12 @@ def describe_method(priority: TripPriority) -> str:
     return f"Porządek leksykograficzny wśród dostępnych wariantów: {order}. Remis: {tie}."
 
 
+COMFORT_RULE = (
+    "Gdy uwzględniono bieżącą pogodę, wariant o niskim komforcie (poor) przesuwany jest na koniec "
+    "rankingu, jeśli istnieje inny dostępny wariant; wagi czasu, kosztu i CO₂ się nie zmieniają."
+)
+
+
 @dataclass(frozen=True, slots=True)
 class ModeScore:
     mode: TransportMode
@@ -83,6 +94,7 @@ class ModeScore:
     normalized_cost: float
     normalized_co2: float
     balanced_score: float
+    weather_demoted: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,9 +139,16 @@ class RecommendationService:
             for mode, norms in normalized.items()
         }
         criteria = self._criteria(priority, balanced)
+        demoted = {e.mode for e in candidates if e.comfort_level is ComfortLevel.POOR}
+        if len(demoted) == len(candidates):  # brak alternatywy — reguła nie działa
+            demoted = set()
 
         def sort_key(estimate: ModeEstimate) -> tuple[float | int, ...]:
-            return (*(c(estimate) for c in criteria), TIE_BREAK_ORDER.index(estimate.mode))
+            return (
+                int(estimate.mode in demoted),
+                *(c(estimate) for c in criteria),
+                TIE_BREAK_ORDER.index(estimate.mode),
+            )
 
         ranked = sorted(candidates, key=sort_key)
         winner = ranked[0]
@@ -143,10 +162,13 @@ class RecommendationService:
                 normalized_cost=round(normalized[e.mode]["cost"], SCORE_DECIMALS),
                 normalized_co2=round(normalized[e.mode]["co2"], SCORE_DECIMALS),
                 balanced_score=balanced[e.mode],
+                weather_demoted=e.mode in demoted,
             )
             for rank, e in enumerate(ranked, start=1)
         )
-        explanation = self._explain(priority, ranked, unavailable, balanced, tie_break_applied)
+        explanation = self._explain(
+            priority, ranked, unavailable, balanced, tie_break_applied, demoted
+        )
         return Recommendation(priority, winner.mode, explanation, scores, tie_break_applied)
 
     @staticmethod
@@ -177,41 +199,75 @@ class RecommendationService:
         unavailable: Sequence[ModeEstimate],
         balanced: dict[TransportMode, float],
         tie_break_applied: bool,
+        demoted: set[TransportMode],
     ) -> str:
         winner = ranked[0]
-        sentences = [self._headline(priority, winner, balanced[winner.mode], len(ranked))]
+        pool = len(ranked) - len(demoted)
+        sentences = [
+            self._headline(priority, winner, balanced[winner.mode], pool, comfort=bool(demoted))
+        ]
         sentences += [self._versus(winner, other) for other in ranked[1:]]
         if tie_break_applied:
             order = " → ".join(MODE_LABELS[m].lower() for m in TIE_BREAK_ORDER)
             sentences.append(f"Wystąpił remis — rozstrzygnięto stałą kolejnością: {order}.")
+        sentences += self._comfort_sentences(ranked, demoted)
         if unavailable:
             sentences.append(self._unavailable_sentence(unavailable))
         sentences.append("Wszystkie wartości są szacunkowe.")
         return " ".join(sentences)
 
     @staticmethod
-    def _headline(priority: TripPriority, winner: ModeEstimate, score: float, count: int) -> str:
+    def _headline(
+        priority: TripPriority,
+        winner: ModeEstimate,
+        score: float,
+        count: int,
+        *,
+        comfort: bool = False,
+    ) -> str:
         label = winner.label
+        # Przy aktywnej regule komfortu porównujemy tylko z wariantami o akceptowalnym komforcie.
+        pool = "wariant o akceptowalnym komforcie pogodowym" if comfort else "dostępny wariant"
+        among = " spośród wariantów o akceptowalnym komforcie pogodowym" if comfort else ""
         if count == 1:
-            return f"{label} to jedyny dostępny wariant."
+            return f"{label} to jedyny {pool}."
         if priority is TripPriority.FASTEST:
-            return (
-                f"{label} to najszybszy dostępny wariant: ok. "
-                f"{fmt_number(winner.duration_min, 0)} min."
-            )
+            return f"{label} to najszybszy {pool}: ok. {fmt_number(winner.duration_min, 0)} min."
         if priority is TripPriority.CHEAPEST:
             return (
-                f"{label} to najtańszy dostępny wariant: ok. "
+                f"{label} to najtańszy {pool}: ok. "
                 f"{fmt_number(winner.cost_pln)} zł za cały przejazd."
             )
         if priority is TripPriority.GREENEST:
             return (
-                f"{label} ma najniższą szacowaną emisję: ok. {fmt_number(winner.co2_kg, 2)} kg CO₂."
+                f"{label} ma najniższą szacowaną emisję{among}: ok. "
+                f"{fmt_number(winner.co2_kg, 2)} kg CO₂."
             )
         return (
-            f"{label} daje najlepszy kompromis czasu, kosztu i emisji "
+            f"{label} daje najlepszy kompromis czasu, kosztu i emisji{among} "
             f"(wynik {fmt_number(score, 2)} w skali 0–1, im mniej, tym lepiej)."
         )
+
+    @staticmethod
+    def _comfort_sentences(
+        ranked: Sequence[ModeEstimate], demoted: set[TransportMode]
+    ) -> list[str]:
+        sentences = []
+        for estimate in ranked:
+            if estimate.mode in demoted:
+                sentences.append(
+                    f"Wariant „{estimate.label}” przesunięto na koniec rankingu: niski komfort "
+                    "przy bieżącej pogodzie."
+                )
+            elif estimate.comfort_level is ComfortLevel.REDUCED:
+                sentences.append(
+                    f"Uwaga: komfort wariantu „{estimate.label}” obniżony przez bieżącą pogodę."
+                )
+            elif estimate.comfort_level is ComfortLevel.POOR:  # brak alternatywy
+                sentences.append(
+                    f"Uwaga: niski komfort wariantu „{estimate.label}” przy bieżącej pogodzie."
+                )
+        return sentences
 
     @staticmethod
     def _versus(winner: ModeEstimate, other: ModeEstimate) -> str:
