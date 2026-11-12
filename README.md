@@ -1,11 +1,12 @@
 # SmartRoute AI
 
-Backend MVP do porównywania środków transportu (samochód, komunikacja miejska, rower) pod kątem
+Aplikacja full-stack (FastAPI + React) do porównywania środków transportu (samochód, komunikacja
+miejska, rower) pod kątem
 **czasu, kosztu i szacowanej emisji CO₂**, z zapisywaniem podróży i rekomendacją środka transportu
 według wybranego priorytetu.
 
-> **Status:** wczesne MVP, tylko backend (REST API). Frontend jest zaplanowany
-> (zob. [`architecture-plan.md`](architecture-plan.md)), ale jeszcze nie powstał.
+> **Status:** MVP: backend REST API oraz frontend React + TypeScript
+> ([szczegóły](#frontend-react--typescript)).
 > Koszty i emisje to **szacunki z uproszczonego modelu parametrycznego**, a nie bieżące ceny
 > paliwa czy oficjalne taryfy. Czas komunikacji miejskiej pochodzi z **planowego rozkładu
 > GTFS Static ZTM Gdańsk**, jeśli podróż ma przystanki i datę wyjazdu, a rozkład został
@@ -19,6 +20,7 @@ według wybranego priorytetu.
 - [Wymagania](#wymagania)
 - [Szybki start (Windows)](#szybki-start-windows)
 - [Uruchomienie backendu](#uruchomienie-backendu)
+- [Frontend (React + TypeScript)](#frontend-react--typescript)
 - [Konfiguracja](#konfiguracja)
 - [Baza danych](#baza-danych)
 - [Rozkład GTFS (ZTM Gdańsk)](#rozkład-gtfs-ztm-gdańsk)
@@ -31,6 +33,9 @@ według wybranego priorytetu.
 
 ## Zaimplementowane funkcje
 
+- **Frontend (dashboard)** ([szczegóły](#frontend-react--typescript)): formularz podróży
+  z wyszukiwarką przystanków GTFS, wyniki porównania, rekomendacja, najbliższe odjazdy z rozkładu
+  i pogoda bieżąca. Działa bez Swagger UI.
 - **CRUD podróży** (`/api/v1/trips`): tworzenie, lista z paginacją i wyszukiwaniem (bez względu
   na wielkość liter, także dla polskich znaków), odczyt, pełna (`PUT`) i częściowa (`PATCH`)
   aktualizacja, usuwanie.
@@ -68,6 +73,8 @@ według wybranego priorytetu.
 | Walidacja   | Pydantic v2, pydantic-settings                 |
 | Testy       | pytest, pytest-cov, httpx (FastAPI TestClient) |
 | Lint/format | Ruff                                           |
+| Frontend    | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, Lucide React |
+| Testy (FE)  | Vitest, Testing Library, jsdom; ESLint (typescript-eslint, react-hooks) |
 
 Zależności są zdefiniowane w [`backend/pyproject.toml`](backend/pyproject.toml). Zweryfikowane,
 przypięte wersje są w [`backend/requirements-lock.txt`](backend/requirements-lock.txt), który
@@ -80,7 +87,8 @@ przypięte wersje są w [`backend/requirements-lock.txt`](backend/requirements-l
   [python.org](https://www.python.org/downloads/). Skrypt szuka go przez launcher `py -3.12`
   albo `python` w `PATH`.
 - Git
-- Dostęp do internetu przy pierwszej instalacji zależności (PyPI)
+- **Node.js ≥ 22.12** (wymóg Vite 8) z npm, tylko dla frontendu. Testowano na Node 26 i npm 11.
+- Dostęp do internetu przy pierwszej instalacji zależności (PyPI, npm)
 
 Sprawdzenie wersji Pythona:
 
@@ -98,7 +106,14 @@ powershell -ExecutionPolicy Bypass -File .\import-gtfs.ps1   # opcjonalnie: rozk
 powershell -ExecutionPolicy Bypass -File .\run.ps1
 ```
 
-Następnie otwórz Swagger UI: **http://127.0.0.1:8000/docs**
+Następnie otwórz Swagger UI: **http://127.0.0.1:8000/docs**. Frontend uruchamia się w drugim
+terminalu ([instrukcja](#frontend-react--typescript)):
+
+```powershell
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+```
 
 Bez importu rozkładu aplikacja działa jak wcześniej. `/stops` i `/connections` zwracają wtedy
 `503 gtfs_not_imported`, a porównanie używa szacunku parametrycznego.
@@ -157,6 +172,185 @@ cd backend
 | http://127.0.0.1:8000/redoc            | ReDoc                  |
 | http://127.0.0.1:8000/openapi.json     | Specyfikacja OpenAPI   |
 | http://127.0.0.1:8000/api/v1/health    | Health check           |
+
+## Frontend (React + TypeScript)
+
+Jednostronicowy dashboard w katalogu [`frontend/`](frontend). Wszystkie dane pochodzą z API
+backendu: frontend nie liczy własnych rekomendacji, nie ma danych demonstracyjnych i nie łączy
+się z Weatherbit (klucz zostaje w `backend/.env`).
+
+### Uruchomienie
+
+Wymaga działającego backendu (`.\run.ps1`). Wyszukiwarka przystanków potrzebuje zaimportowanego
+rozkładu (`.\import-gtfs.ps1`).
+
+```powershell
+cd frontend
+npm install          # pierwsza instalacja (wersje przypięte w package-lock.json)
+npm run dev          # dev server: http://localhost:5173
+```
+
+| Polecenie           | Opis                                                     |
+|---------------------|----------------------------------------------------------|
+| `npm run dev`       | serwer deweloperski Vite z proxy `/api` → backend        |
+| `npm run build`     | kontrola typów (`tsc -b`) + build produkcyjny do `dist/` |
+| `npm run preview`   | podgląd buildu produkcyjnego (port 4173, także z proxy)  |
+| `npm run typecheck` | sama kontrola TypeScript                                 |
+| `npm run lint`      | ESLint                                                   |
+| `npm test`          | testy Vitest (jsdom, bez sieci i bez backendu)           |
+
+### Komunikacja z backendem
+
+- Frontend wysyła żądania na względny adres `/api/v1`. Dev server Vite
+  ([`vite.config.ts`](frontend/vite.config.ts)) przekazuje `/api` do `http://127.0.0.1:8000`,
+  więc przeglądarka widzi jeden origin i CORS nie jest potrzebny.
+- Inny adres backendu dla proxy ustawisz zmienną `VITE_BACKEND_PROXY_TARGET` w
+  `frontend/.env.local` (wzór: [`frontend/.env.example`](frontend/.env.example)).
+- Bez proxy, np. przy statycznym hostingu `dist/`, ustaw `VITE_API_BASE_URL`
+  (np. `http://127.0.0.1:8000/api/v1`) i dodaj origin frontendu do `CORS_ORIGINS` w
+  `backend/.env`. Domyślnie backend dopuszcza `http://localhost:5173`.
+
+Przepływ porównania ([`useComparison.ts`](frontend/src/hooks/useComparison.ts)):
+
+1. `GET /stops?query=…`: podpowiedzi przystanków (opóźnienie 250 ms, anulowanie nieaktualnych
+   żądań).
+2. `POST /trips`: zapis podróży z `origin_stop_id`, `destination_stop_id` i `departure_at`
+   (czas lokalny Gdańska bez strefy). Jako `origin` i `destination` trafiają nazwy przystanków.
+3. `GET /trips/{id}/compare` oraz równolegle `GET /connections` (okno 180 min, zgodne
+   z `GTFS_SEARCH_WINDOW_MIN`). Odpowiedź `/compare` zawiera tylko najlepszy kurs w
+   `assumptions`, więc listę odjazdów pobieramy osobno.
+4. Zmiana samego priorytetu, przy niezmienionych pozostałych danych, nie tworzy nowej podróży.
+   Używa wtedy parametru `?priority=` na tej samej podróży.
+
+Typy w [`src/types/api.ts`](frontend/src/types/api.ts) odwzorowują schematy Pydantic
+z `backend/app/schemas`. Błędy `{detail, code}` są zamieniane na komunikaty po polsku
+([`utils/errors.ts`](frontend/src/utils/errors.ts)), a błędy 422 trafiają do konkretnych pól.
+
+### Układ i decyzje UX
+
+Ekran czyta się od góry do dołu: planer podróży, potem wyniki, a na końcu pomoc.
+
+- **Planer na pełnej szerokości zamiast wąskiej kolumny.** Formularz jest kompaktowym, poziomym
+  panelem (kontener do 1440 px). Na desktopie mieści się w 2–3 wierszach: trasa i termin, potem
+  dystans i priorytet, potem pasek opcji z przyciskiem „Porównaj”. Wyniki zajmują całą szerokość
+  pod formularzem, więc nie zostaje pusta kolumna. Przycisk nie jest przyklejony (sticky), więc
+  niczego nie zasłania na małych ekranach.
+- **Najważniejsze pola widoczne, drugorzędne zwinięte.** Przystanki, termin, dystans i priorytet
+  są zawsze widoczne. Pasażerowie i dostępność samochodu i roweru tworzą kompaktowy pasek.
+  Nazwa podróży jest w sekcji „Opcje zaawansowane”, która otwiera się sama, gdy pole ma błąd.
+- **Mniej stałego drobnego tekstu.** Dłuższe wyjaśnienia przeniesiono do dymków `InfoTip`
+  (hover, focus klawiatury, dotyk, Escape; treść podpięta przez `aria-describedby`) i do
+  rozwijanych sekcji. Informacja, że dystans jest szacunkowy, zostaje w etykiecie pola.
+- **Karty wariantów z metrykami w wierszach.** Etykieta „Czas / Koszt / CO₂” stoi po lewej,
+  a duża wartość liczbowa po prawej. Wartości w kolejnych kartach leżą na tej samej wysokości,
+  więc łatwo je porównać. Siatka ma 3 kolumny dopiero od `xl` (≥ 1280 px), 2 + 1 na tabletach
+  (ostatnia karta na pełną szerokość) i 1 kolumnę na telefonie. Gdy karta jest szeroka (container
+  query `@md`), metryki układają się w 3 kolumny. Miejsce w rankingu to krótki tekst
+  („Miejsce 2 z 3”), a rekomendowany wariant ma etykietę „Rekomendowany”, nie tylko kolor.
+- **Kompaktowa rekomendacja.** Panel pokazuje nazwę wariantu, priorytet, pierwsze zdanie
+  uzasadnienia z backendu, korzyści wynikające z danych (np. „Najniższy koszt”) i trzy kluczowe
+  liczby. Pełne uzasadnienie i opis metody są w sekcji rozwijanej. Ostrzeżenia (pogoda,
+  pominięte warianty, remis) są zawsze widoczne.
+- **Pomoc pod aplikacją.** Sekcja „Jak to działa?” to zwinięte akordeony pod wynikami, a stan
+  początkowy to jedna krótka zachęta bez fikcyjnych wyników.
+- **Szybka korekta.** Pasek podsumowania nad wynikami pozwala zmienić priorytet jednym kliknięciem
+  i ma przycisk „Edytuj”, który przewija do formularza i ustawia focus na pierwszym polu.
+
+### Prezentacja danych GTFS i szacunków
+
+Czas komunikacji miejskiej i lista odjazdów to dwie różne informacje, prezentowane osobno:
+
+| Sytuacja | Karta „Komunikacja miejska” | Panel „Odjazdy z rozkładu” |
+|----------|-----------------------------|----------------------------|
+| Backend użył rozkładu (`data_source: gtfs_schedule`) | „Czas z rozkładu GTFS” + linia, kierunek i godzina odjazdu | lista kursów, użyty kurs oznaczony „użyty w porównaniu” |
+| Szacunek, a rozkład nie ma kursu bezpośredniego w oknie 180 min | etykieta czasu „Czas (szac.)” i ostrzeżenie **„Czas szacunkowy — brak potwierdzonego kursu GTFS”** | „Brak kursu bezpośredniego w rozkładzie”, informacja, że **nie oznacza to braku połączenia z przesiadką**, sugestie i przycisk „Zmień przystanki lub godzinę” |
+| Szacunek, a rozkładu nie udało się pobrać | „Czas szacunkowy — nie sprawdzono rozkładu” | komunikat błędu z instrukcją |
+
+- Wariant komunikacji zostaje w porównaniu zawsze wtedy, gdy zwraca go backend. Frontend
+  niczego nie przelicza i nie zmienia rankingu.
+- Kurs z panelu jest oznaczany jako użyty tylko po jednoznacznym dopasowaniu linii i godziny
+  odjazdu do założeń backendu ([`utils/transit.ts`](frontend/src/utils/transit.ts)). Karta
+  i panel korzystają z tego samego wyniku, więc nie mogą sobie przeczyć.
+- Odjazdy mają etykietę „GTFS Static · bez opóźnień”. Nie pokazujemy fikcyjnych opóźnień ani
+  danych w czasie rzeczywistym.
+
+### Najważniejsze funkcje
+
+- Wyszukiwarka przystanków GTFS jako dostępny combobox (strzałki, Enter, Escape). Po wyborze
+  widoczna jest nazwa i numer słupka. Dostępne są przyciski „Zmień” i „Zamień kierunek”,
+  a przystanku wybranego w drugim polu nie da się wybrać ponownie.
+- Data i godzina ustawiają się domyślnie na „teraz” w strefie Europe/Warsaw. Jest przycisk
+  „Ustaw teraz” i ostrzeżenie o terminie w przeszłości.
+- **Dystans szacunkowy w km** wpisuje użytkownik. Jako punkt odniesienia formularz pokazuje
+  odległość w linii prostej między przystankami z dopiskiem „trasa będzie dłuższa”. Aplikacja
+  nie wyznacza trasy drogowej.
+- Pasażerowie (1–8), priorytet w formie segmentów z opisem wybranej opcji, przełączniki
+  samochodu i roweru, opcjonalna nazwa (domyślnie „Start → Cel”).
+- Karty wariantów pokazują czas, koszt i CO₂ (łącznie i na osobę), miejsce w rankingu,
+  dostępność z powodem, pochodzenie danych, komfort pogodowy oraz rozwijane założenia.
+- Panel pogody pokazuje temperaturę, wiatr, opady, śnieg i wpływ na rower, z etykietą „aktualne
+  warunki, nie prognoza”. Gdy danych brak, wyświetla neutralny komunikat.
+- Wskaźnik stanu backendu i komunikat z instrukcją, gdy backend nie działa.
+
+### Heurystyki Nielsena w interfejsie
+
+| # | Heurystyka | Zastosowanie | Komponenty |
+|---|------------|--------------|------------|
+| 1 | Widoczność stanu systemu | Spinner w wyszukiwarce i na przycisku („Zapisywanie podróży…”, „Obliczanie porównania…”), szkielet wyników, przyciemnienie przy przeliczaniu, status backendu w nagłówku, komunikaty `aria-live`, blokada ponownego wysłania, przycisk „Porównaj ponownie” po pierwszym wyniku | `StopPicker`, `TripForm`, `DashboardPage`, `Header` |
+| 2 | Zgodność ze światem rzeczywistym | Polskie etykiety, `Intl` pl-PL (`2,50 zł`, `0,94 kg`, `1 h 5 min`), godziny w czasie Gdańska, nazwy przystanków zamiast `stop_id`, „tramwaj/autobus” zamiast `route_type`, „za 5 min” zamiast surowego czasu oczekiwania | `utils/format.ts`, `VariantCard`, `SchedulePanel` |
+| 3 | Kontrola i swoboda | Formularz zawsze nad wynikami, „Edytuj” w pasku podsumowania, „Zmień przystanki lub godzinę” przy braku kursu, „Zmień” i „Zamień kierunek”, szybka zmiana priorytetu, dane zachowane po błędzie, „Spróbuj ponownie” | `TripForm`, `ResultsSection`, `SchedulePanel`, `StopPicker` |
+| 4 | Spójność i standardy | Wspólne klasy `card`/`btn`/`input`/`badge`, ten sam selektor priorytetu w formularzu i nad wynikami, ten sam układ metryk w każdej karcie, stałe kolory i ikony środków transportu, etykiety pól zgodne z podsumowaniem błędów | `index.css`, `PrioritySelector`, `VariantCard`, `ModeIcon` |
+| 5 | Zapobieganie błędom | Walidacja przed wysłaniem (przystanki, różne przystanki, dystans > 0 i ≤ 1000, 1–8 pasażerów, poprawna data i godzina), blokada wyboru tego samego przystanku, przyciski +/−, wybór przystanku tylko z listy, `maxLength` nazwy | `utils/tripForm.ts`, `StopPicker`, `TripForm` |
+| 6 | Rozpoznawanie zamiast przypominania | Podpowiedzi przystanków bez polskich znaków, nazwa i słupek wybranego przystanku, stały opis wybranego priorytetu, korzyści rekomendacji nazwane wprost, użyty kurs oznaczony w rozkładzie | `StopPicker`, `PrioritySelector`, `RecommendationPanel`, `SchedulePanel` |
+| 7 | Elastyczność i efektywność | Kompaktowy planer (mniej przewijania), domyślnie „teraz”, 1 pasażer i „zrównoważony”, automatyczna nazwa, „Wstaw” dystans w linii prostej jako punkt wyjścia, zmiana priorytetu bez tworzenia nowej podróży, automatyczne przewinięcie do wyników | `TripForm`, `useComparison`, `ResultsSection`, `DashboardPage` |
+| 8 | Estetyka i minimalizm | Hierarchia: podsumowanie → rekomendacja → karty → rozkład i pogoda → objaśnienia. Lead zamiast pełnego uzasadnienia, szczegóły w dymkach i sekcjach rozwijanych, mniej ramek w ramkach | `RecommendationPanel`, `VariantCard`, `ui/InfoTip`, `HelpPanel` |
+| 9 | Rozpoznawanie i naprawa błędów | Komunikaty zamiast kodów HTTP, z krokami naprawy (`run.ps1`, `import-gtfs.ps1`), błędy 422 przy polach, podsumowanie błędów z linkami, przy braku kursu GTFS: wyjaśnienie (inny słupek, godzina, przesiadki nieobsługiwane) i przycisk powrotu do formularza | `utils/errors.ts`, `TripForm`, `SchedulePanel`, `DashboardPage` |
+| 10 | Pomoc i dokumentacja | Akordeony „Jak to działa?” pod aplikacją (metoda, szacunki, GTFS, Weatherbit, ograniczenia), dymki przy dystansie, przełącznikach, rozkładzie i pogodzie, metoda przy rekomendacji | `HelpPanel`, `ui/InfoTip`, `RecommendationPanel` |
+
+Dostępność: semantyczne sekcje i nagłówki, etykiety pól, `aria-invalid` i `aria-describedby`
+dla błędów, `role="alert"` dla błędów wymagających reakcji, widoczny focus, link „Przejdź do
+formularza”, natywne radio i checkbox (`role="switch"`), cele klikalne o wysokości co najmniej
+40 px, obsługa `prefers-reduced-motion`. Wyłączony środek transportu jest przekreślony,
+a nie tylko wyszarzony. Układ docelowo obsługuje szerokości 360, 768, 1024 i 1440 px; patrz
+[ręczna weryfikacja](#ręczna-weryfikacja-układu).
+
+### Ręczna weryfikacja układu
+
+Testy automatyczne (jsdom) nie sprawdzają wyglądu. Przed prezentacją warto w DevTools
+(tryb urządzenia) sprawdzić szerokości 360, 768, 1024 i 1440 px:
+
+1. Brak poziomego paska przewijania. Pola daty i godziny oraz pasek opcji mieszczą się w kadrze.
+2. Planer: na 1440 px ma 3 wiersze, a przycisk „Porównaj” jest po prawej. Na 360 px pola
+   są w jednej kolumnie, a przycisk na pełną szerokość.
+3. Karty: 3 w rzędzie na 1440 px, 2 + 1 na 768 i 1024 px, jedna kolumna na 360 px. Nazwy
+   i wartości nie łamią się.
+4. Trasa bez kursu bezpośredniego (np. **Dworzec Główny 02 → Zaspa 01**): karta komunikacji
+   pokazuje „Czas szacunkowy — brak potwierdzonego kursu GTFS”, a panel pokazuje wyjaśnienie
+   i przycisk „Zmień przystanki lub godzinę”.
+5. Trasa z kursem (np. **Dworzec Główny 01 → Zaspa 01**): karta pokazuje „Czas z rozkładu GTFS”,
+   a w panelu jeden kurs ma oznaczenie „użyty w porównaniu”.
+6. Nawigacja wyłącznie klawiaturą: Tab, strzałki w liście przystanków i w priorytecie, Escape
+   zamyka dymek.
+
+### Struktura
+
+```
+frontend/
+├── index.html  vite.config.ts  eslint.config.js  tsconfig*.json  .env.example
+└── src/
+    ├── main.tsx  App.tsx  index.css   # punkt wejścia, motyw Tailwind (@theme)
+    ├── pages/DashboardPage.tsx        # układ i orkiestracja przepływu
+    ├── components/                    # TripForm, StopPicker, PrioritySelector, ResultsSection,
+    │   │                              # VariantCard, RecommendationPanel, SchedulePanel,
+    │   │                              # WeatherPanel, HelpPanel, Header, EmptyState, ModeIcon
+    │   └── ui/                        # Alert, Spinner, InfoTip
+    ├── hooks/                         # useComparison, useStopSearch, useBackendHealth
+    ├── services/                      # apiClient (fetch + ApiError), smartrouteApi (endpointy)
+    ├── types/api.ts                   # typy kontraktu API
+    ├── utils/                         # formatowanie, data/czas, walidacja, błędy, etykiety,
+    │                                  # wyniki, status GTFS (transit.ts)
+    └── test/setup.ts
+```
 
 ## Konfiguracja
 
@@ -651,6 +845,7 @@ smartroute-ai/
 ├── run.ps1                    # uruchomienie backendu
 ├── import-gtfs.ps1            # import / odświeżenie rozkładu GTFS
 ├── architecture-plan.md       # docelowa architektura MVP (backend + frontend)
+├── frontend/                  # React + TypeScript + Vite (zob. sekcja Frontend)
 └── backend/
     ├── pyproject.toml         # zależności, konfiguracja pytest i ruff
     ├── requirements-lock.txt  # przypięte wersje (constraints)
@@ -705,13 +900,20 @@ FastAPI ani bazy danych.
 - **SQLite** wystarcza do pracy lokalnej i demonstracji, ale nie jest przeznaczona do wdrożeń
   wieloinstancyjnych.
 - Tylko waluta PLN. Komunikaty API są po polsku.
-- Brak frontendu i konteneryzacji.
+- **Frontend:**
+  - jedna strona bez historii zapisanych podróży (CRUD jest dostępny w API, ale bez widoku listy),
+  - każde porównanie z nowymi danymi zapisuje podróż w bazie backendu,
+  - wybór przystanków jest wymagany, więc bez importu GTFS porównania nie da się uruchomić
+    z interfejsu (w API nadal działa),
+  - tylko ciemny motyw i brak map,
+  - opis warunków pogodowych pochodzi z Weatherbit w języku angielskim (np. „Few clouds”).
+- Brak konteneryzacji.
 - Znane ostrzeżenie w testach: Starlette zgłasza `StarletteDeprecationWarning` dotyczące użycia
   `httpx` w `TestClient`. Nie wpływa ono na wyniki testów.
 
 ## Planowane funkcje
 
-- Frontend React + TypeScript + Tailwind (Vite), zgodnie z `architecture-plan.md`
+- Widok historii zapisanych podróży we frontendzie (edycja i usuwanie przez istniejące API)
 - Połączenia z przesiadkami (np. RAPTOR / CSA na zaimportowanych `stop_times`)
 - Wybór najbliższych przystanków po współrzędnych i czas dojścia pieszo
 - GTFS-Realtime (opóźnienia) jako osobne, jawnie oznaczone źródło danych
