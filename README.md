@@ -250,7 +250,14 @@ Ekran czyta się od góry do dołu: planer podróży, potem wyniki, a na końcu 
 - **Kompaktowa rekomendacja.** Panel pokazuje nazwę wariantu, priorytet, pierwsze zdanie
   uzasadnienia z backendu, korzyści wynikające z danych (np. „Najniższy koszt”) i trzy kluczowe
   liczby. Pełne uzasadnienie i opis metody są w sekcji rozwijanej. Ostrzeżenia (pogoda,
-  pominięte warianty, remis) są zawsze widoczne.
+  pominięte warianty, remis, komunikacja rekomendowana bez potwierdzonego kursu GTFS) są zawsze
+  widoczne.
+- **Remisy.** Oznaczenia „najkrótszy / najniższy” porównują wartości tak, jak są wyświetlane
+  (np. 13,2 i 13,4 min to dwa razy „13 min”). Gdy kilka wariantów ma tę samą najlepszą wartość,
+  każdy dostaje oznaczenie „ex aequo”. Wybór jednej rekomendacji zawsze należy do backendu:
+  przy remisie metryki głównej decyduje kolejna metryka (fastest: czas → koszt → CO₂ itd.),
+  a uzasadnienie mówi to wprost. Pełny remis rozstrzyga stała kolejność rower → komunikacja
+  miejska → samochód (`scoring.tie_break_order`).
 - **Pomoc pod aplikacją.** Sekcja „Jak to działa?” to zwinięte akordeony pod wynikami, a stan
   początkowy to jedna krótka zachęta bez fikcyjnych wyników.
 - **Szybka korekta.** Pasek podsumowania nad wynikami pozwala zmienić priorytet jednym kliknięciem

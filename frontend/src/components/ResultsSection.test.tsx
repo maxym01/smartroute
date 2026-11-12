@@ -98,7 +98,11 @@ function connectionList(connections: Connection[]): ConnectionList {
   };
 }
 
-function makeResult(variants: ModeEstimate[], schedule: ScheduleState = { status: 'loading' }): ComparisonResult {
+function makeResult(
+  variants: ModeEstimate[],
+  schedule: ScheduleState = { status: 'loading' },
+  recommended: Pick<ModeEstimate, 'mode' | 'label'> = bike,
+): ComparisonResult {
   const comparison: ComparisonResponse = {
     trip_id: 7,
     priority: 'balanced',
@@ -108,8 +112,8 @@ function makeResult(variants: ModeEstimate[], schedule: ScheduleState = { status
     disclaimer: 'Wszystkie wartości są szacunkami.',
     variants,
     recommendation: {
-      mode: 'bike',
-      label: 'Rower',
+      mode: recommended.mode,
+      label: recommended.label,
       explanation: 'Rower daje najlepszy kompromis (z backendu). Względem wariantu „Samochód”: 9 min dłużej.',
       tie_break_applied: false,
     },
@@ -231,5 +235,48 @@ describe('ResultsSection', () => {
     renderResults(makeResult([car, transitEstimate, bike], { status: 'error', error: new Error('x') }));
     const transitCard = screen.getByRole('article', { name: 'Komunikacja miejska' });
     expect(within(transitCard).getByText('Czas szacunkowy — nie sprawdzono rozkładu')).toBeInTheDocument();
+  });
+
+  it('ostrzega w panelu rekomendacji, gdy komunikacja wygrywa bez potwierdzonego kursu GTFS', () => {
+    renderResults(makeResult([car, transitEstimate, bike], { status: 'success', data: connectionList([]) }, transitEstimate));
+
+    const panel = screen.getByRole('region', { name: 'Komunikacja miejska' });
+    const warning = within(panel).getByText(/rekomendowana na podstawie czasu szacunkowego/);
+    expect(warning).toHaveTextContent('nie znaleziono potwierdzonego kursu bezpośredniego GTFS w ciągu 180 min');
+    expect(warning).toHaveTextContent('połączeń z przesiadkami aplikacja nie sprawdza');
+    expect(warning).toHaveTextContent('nie gwarantuje dostępnego połączenia');
+    // Komunikacja nadal jest w rankingu — brak kursu bezpośredniego ≠ brak komunikacji.
+    const card = screen.getByRole('article', { name: 'Komunikacja miejska' });
+    expect(within(card).getByText('Rekomendowany')).toBeInTheDocument();
+    expect(within(card).queryByText('Pominięty')).not.toBeInTheDocument();
+  });
+
+  it('nie ostrzega w panelu rekomendacji, gdy czas komunikacji pochodzi z rozkładu', () => {
+    const used = connection({ trip_id: 'used', line: '2', headsign: 'Jelitkowo', departure_at: '2026-11-12T19:17:00+01:00' });
+    renderResults(makeResult([car, transitScheduled, bike], { status: 'success', data: connectionList([used]) }, transitScheduled));
+
+    const panel = screen.getByRole('region', { name: 'Komunikacja miejska' });
+    expect(within(panel).queryByText(/czasu szacunkowego/)).not.toBeInTheDocument();
+  });
+
+  it('nie dodaje ostrzeżenia o komunikacji, gdy rekomendowany jest inny wariant', () => {
+    renderResults(makeResult([car, transitEstimate, bike], { status: 'success', data: connectionList([]) }));
+    const panel = screen.getByRole('region', { name: 'Rower' });
+    expect(within(panel).queryByText(/czasu szacunkowego/)).not.toBeInTheDocument();
+  });
+
+  it('oznacza remis najkrótszego czasu jako ex aequo w kartach i w panelu', () => {
+    // 13,2 i 13,4 min wyświetlają się jako „13 min” — żaden nie może być „jedynym najkrótszym”.
+    const fastBike = variant({ ...bike, estimated_duration_min: 13.4 });
+    renderResults(makeResult([car, fastBike, transitEstimate], { status: 'loading' }, car));
+
+    const carCard = screen.getByRole('article', { name: 'Samochód' });
+    const bikeCard = screen.getByRole('article', { name: 'Rower' });
+    expect(within(carCard).getByText('najkrótszy ex aequo')).toBeInTheDocument();
+    expect(within(bikeCard).getByText('najkrótszy ex aequo')).toBeInTheDocument();
+    expect(screen.queryByText('najkrótszy')).not.toBeInTheDocument();
+
+    const benefits = screen.getByRole('list', { name: 'Najważniejsze korzyści' });
+    expect(within(benefits).getByText('Najkrótszy czas (ex aequo z: Rower)')).toBeInTheDocument();
   });
 });

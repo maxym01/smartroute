@@ -233,3 +233,34 @@ def test_service_rejects_duplicate_calculators() -> None:
     params = TransportSettings().car
     with pytest.raises(ValueError, match="jeden kalkulator"):
         ComparisonService([CarCalculator(params), CarCalculator(params)])
+
+
+def test_primary_tie_is_explained_in_recommendation() -> None:
+    # Remis czasu przy „fastest”: zwycięzca wybrany kosztem, a uzasadnienie mówi to wprost.
+    rec = recommender.recommend(
+        [estimate(CAR, 30, 3, 2), estimate(BIKE, 30, 4, 0)], TripPriority.FASTEST
+    )
+    assert "Taką samą wartość kryterium „czas” ma wariant „Rower”" in rec.explanation
+    assert "rozstrzygnęło kolejne kryterium: koszt" in rec.explanation
+
+
+def test_no_tie_sentence_without_primary_tie() -> None:
+    rec = recommender.recommend(CITY, TripPriority.FASTEST)
+    assert "Taką samą wartość" not in rec.explanation
+
+
+@pytest.mark.parametrize(
+    ("priority", "metric"),
+    [
+        (TripPriority.FASTEST, "duration_min"),
+        (TripPriority.CHEAPEST, "cost_pln"),
+        (TripPriority.GREENEST, "co2_kg"),
+    ],
+)
+def test_single_metric_priority_winner_has_minimum_value(
+    priority: TripPriority, metric: str
+) -> None:
+    for pool in (CITY, CITY[:2], CITY[1:], [CITY[0], CITY[2]]):
+        rec = recommender.recommend(pool, priority)
+        winner = next(e for e in pool if e.mode is rec.mode)
+        assert getattr(winner, metric) == min(getattr(e, metric) for e in pool)

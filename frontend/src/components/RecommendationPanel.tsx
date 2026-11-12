@@ -1,8 +1,9 @@
 import { Check, ChevronDown, CircleSlash, Info, TriangleAlert } from 'lucide-react';
 import type { ComparisonResponse } from '../types/api';
 import { formatCo2, formatCost, formatDuration } from '../utils/format';
-import { COMFORT_LABELS, priorityLabel } from '../utils/labels';
-import { bestMetrics, splitExplanation, type MetricKey } from '../utils/results';
+import { COMFORT_LABELS, MODE_LABELS, priorityLabel } from '../utils/labels';
+import { bestMetrics, splitExplanation, type BestMetric, type MetricKey } from '../utils/results';
+import type { TransitStatus } from '../utils/transit';
 import { ModeIcon } from './ModeIcon';
 
 const BENEFIT_LABELS: Record<MetricKey, string> = {
@@ -11,17 +12,48 @@ const BENEFIT_LABELS: Record<MetricKey, string> = {
   co2: 'Najniższa emisja CO₂',
 };
 
+function benefitLabel({ metric, sharedWith }: BestMetric): string {
+  if (sharedWith.length === 0) return BENEFIT_LABELS[metric];
+  return `${BENEFIT_LABELS[metric]} (ex aequo z: ${sharedWith.map((mode) => MODE_LABELS[mode]).join(', ')})`;
+}
+
+/**
+ * Ostrzeżenie, gdy rekomendowana komunikacja opiera się na szacunku, a nie na potwierdzonym kursie.
+ * Brak kursu bezpośredniego nie oznacza, że komunikacja jest niedostępna — stąd ostrzeżenie,
+ * a nie zmiana rekomendacji (tę wybiera wyłącznie backend).
+ */
+function transitWarning(status: TransitStatus | undefined): string | null {
+  if (!status || status.kind === 'confirmed') return null;
+  const reason =
+    status.kind === 'no_connection'
+      ? `nie znaleziono potwierdzonego kursu bezpośredniego GTFS w ciągu ${status.windowMin} min, a połączeń z przesiadkami aplikacja nie sprawdza`
+      : status.kind === 'schedule_unavailable'
+        ? 'nie udało się sprawdzić rozkładu GTFS'
+        : 'czas nie pochodzi z rozkładu GTFS';
+  return `Komunikacja miejska jest rekomendowana na podstawie czasu szacunkowego: ${reason}. Rekomendacja nie gwarantuje dostępnego połączenia — sprawdź rozkład przed wyjazdem.`;
+}
+
+interface RecommendationPanelProps {
+  comparison: ComparisonResponse;
+  /** Status czasu komunikacji (ten sam co w karcie i panelu odjazdów). */
+  transit?: TransitStatus;
+}
+
 /**
  * Rekomendacja pochodzi wyłącznie z backendu. Frontend dodaje jedynie opis danych:
  * w których metrykach rekomendowany wariant jest najlepszy oraz jawne ostrzeżenia.
  */
-export function RecommendationPanel({ comparison }: { comparison: ComparisonResponse }) {
+export function RecommendationPanel({ comparison, transit }: RecommendationPanelProps) {
   const { recommendation, scoring, variants } = comparison;
   const winner = variants.find((variant) => variant.mode === recommendation.mode);
   const benefits = recommendation.mode ? (bestMetrics(variants).get(recommendation.mode) ?? []) : [];
   const { lead } = splitExplanation(recommendation.explanation);
 
+  const transitText = recommendation.mode === 'public_transport' ? transitWarning(transit) : null;
+  const tieOrder = scoring.tie_break_order.map((mode) => MODE_LABELS[mode].toLowerCase()).join(' → ');
+
   const warnings: { key: string; tone: 'warning' | 'info'; text: string }[] = [
+    ...(transitText ? [{ key: 'transit-estimate', tone: 'warning' as const, text: transitText }] : []),
     ...variants
       .filter((variant) => variant.available && variant.comfort_level && variant.comfort_level !== 'good')
       .map((variant) => ({
@@ -43,7 +75,7 @@ export function RecommendationPanel({ comparison }: { comparison: ComparisonResp
           {
             key: 'tie',
             tone: 'info' as const,
-            text: 'Remis — rozstrzygnięto stałą kolejnością: rower → komunikacja → samochód.',
+            text: `Remis — rozstrzygnięto stałą kolejnością: ${tieOrder}.`,
           },
         ]
       : []),
@@ -68,13 +100,13 @@ export function RecommendationPanel({ comparison }: { comparison: ComparisonResp
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-300">{lead}</p>
             {benefits.length > 0 && (
               <ul className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Najważniejsze korzyści">
-                {benefits.map((metric) => (
+                {benefits.map((benefit) => (
                   <li
-                    key={metric}
+                    key={benefit.metric}
                     className="badge border-accent-400/30 bg-accent-400/10 py-1 text-accent-300"
                   >
                     <Check aria-hidden="true" className="size-3.5" />
-                    {BENEFIT_LABELS[metric]}
+                    {benefitLabel(benefit)}
                   </li>
                 ))}
               </ul>

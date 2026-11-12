@@ -15,7 +15,7 @@ import type { ReactNode } from 'react';
 import type { ModeEstimate } from '../types/api';
 import { formatCo2, formatCost, formatDuration, formatTime } from '../utils/format';
 import { COMFORT_LABELS } from '../utils/labels';
-import type { MetricKey } from '../utils/results';
+import type { BestMetric, MetricKey } from '../utils/results';
 import type { TransitStatus } from '../utils/transit';
 import { ModeIcon } from './ModeIcon';
 
@@ -25,8 +25,8 @@ interface VariantCardProps {
   isRecommended: boolean;
   /** Liczba dostępnych wariantów (do „Miejsce 2 z 3”). */
   rankedCount: number;
-  /** Metryki, w których wariant wypada najlepiej spośród dostępnych. */
-  bestIn: MetricKey[];
+  /** Metryki, w których wariant wypada najlepiej spośród dostępnych (z informacją o remisie). */
+  bestIn: BestMetric[];
   /** Tylko dla komunikacji miejskiej: zgodność z panelem rozkładu GTFS. */
   transit?: TransitStatus;
 }
@@ -67,6 +67,19 @@ function MetricRow({
   );
 }
 
+const BEST_LABELS: Record<MetricKey, string> = {
+  duration: 'najkrótszy',
+  cost: 'najniższy',
+  co2: 'najniższa',
+};
+
+/** „najkrótszy” albo „najkrótszy ex aequo”, gdy inny wariant ma tę samą (wyświetlaną) wartość. */
+function bestLabel(bestIn: BestMetric[], metric: MetricKey): string | undefined {
+  const best = bestIn.find((item) => item.metric === metric);
+  if (!best) return undefined;
+  return best.sharedWith.length > 0 ? `${BEST_LABELS[metric]} ex aequo` : BEST_LABELS[metric];
+}
+
 const COMFORT_STYLES = {
   good: 'text-emerald-300',
   reduced: 'text-amber-300',
@@ -98,12 +111,12 @@ function TransitNote({ status }: { status: TransitStatus }) {
     status.kind === 'no_connection'
       ? {
           title: 'Czas szacunkowy — brak potwierdzonego kursu GTFS',
-          detail: `Nie znaleziono kursu bezpośredniego w ciągu ${status.windowMin} min. Połączeń z przesiadką aplikacja nie sprawdza.`,
+          detail: `Nie znaleziono kursu bezpośredniego w ciągu ${status.windowMin} min, a połączeń z przesiadką aplikacja nie sprawdza. To nie jest potwierdzony czas przejazdu ani gwarancja połączenia.`,
         }
       : status.kind === 'schedule_unavailable'
         ? {
             title: 'Czas szacunkowy — nie sprawdzono rozkładu',
-            detail: 'Rozkład GTFS był niedostępny, więc kursu nie potwierdzono.',
+            detail: 'Rozkład GTFS był niedostępny, więc kursu nie potwierdzono. To nie jest potwierdzony czas przejazdu.',
           }
         : {
             title: 'Czas szacunkowy (model parametryczny)',
@@ -178,7 +191,7 @@ export function VariantCard({
             icon={<Clock aria-hidden="true" className="size-4" />}
             label={isEstimate ? 'Czas (szac.)' : 'Czas'}
             value={formatDuration(variant.estimated_duration_min)}
-            best={bestIn.includes('duration') ? 'najkrótszy' : undefined}
+            best={bestLabel(bestIn, 'duration')}
           />
           <MetricRow
             icon={<Wallet aria-hidden="true" className="size-4" />}
@@ -189,7 +202,7 @@ export function VariantCard({
                 ? `${formatCost(variant.estimated_cost_per_passenger_pln)} / os.`
                 : undefined
             }
-            best={bestIn.includes('cost') ? 'najniższy' : undefined}
+            best={bestLabel(bestIn, 'cost')}
           />
           <MetricRow
             icon={<Leaf aria-hidden="true" className="size-4" />}
@@ -200,7 +213,7 @@ export function VariantCard({
                 ? `${formatCo2(variant.estimated_co2_per_passenger_kg).replace(' CO₂', '')} / os.`
                 : undefined
             }
-            best={bestIn.includes('co2') ? 'najniższa' : undefined}
+            best={bestLabel(bestIn, 'co2')}
           />
         </dl>
       ) : (

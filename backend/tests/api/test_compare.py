@@ -223,3 +223,51 @@ def test_compare_is_deterministic(client: TestClient, create_trip) -> None:
     second = client.get(compare_url(trip["id"])).json()
 
     assert first == second
+
+
+def test_compare_without_bike_keeps_car_and_public_transport(
+    client: TestClient, create_trip
+) -> None:
+    trip = create_trip(allow_bike=False, priority="greenest")
+
+    body = client.get(compare_url(trip["id"])).json()
+
+    variants = variants_by_mode(body)
+    assert variants["bike"]["available"] is False
+    assert "allow_bike" in variants["bike"]["unavailable_reason"]
+    assert variants["bike"]["score"] is None
+    assert variants["car"]["available"] and variants["public_transport"]["available"]
+    assert body["recommendation"]["mode"] == "public_transport"
+
+
+@pytest.mark.parametrize(("distance_km", "available"), [(20, True), (20.1, False)])
+def test_compare_bike_distance_limit_boundary(
+    client: TestClient, create_trip, distance_km: float, available: bool
+) -> None:
+    trip = create_trip(distance_km=distance_km)
+
+    bike = variants_by_mode(client.get(compare_url(trip["id"])).json())["bike"]
+
+    assert bike["available"] is available
+    assert (bike["score"] is None) is not available
+
+
+@pytest.mark.parametrize(
+    ("priority", "field"),
+    [
+        ("fastest", "estimated_duration_min"),
+        ("cheapest", "estimated_cost_pln"),
+        ("greenest", "estimated_co2_kg"),
+    ],
+)
+def test_compare_priority_winner_has_best_metric(
+    client: TestClient, create_trip, priority: str, field: str
+) -> None:
+    trip = create_trip(distance_km=7, passengers=2)
+
+    body = client.get(compare_url(trip["id"]), params={"priority": priority}).json()
+
+    available = [v for v in body["variants"] if v["available"]]
+    winner = variants_by_mode(body)[body["recommendation"]["mode"]]
+    assert winner["score"]["rank"] == 1
+    assert winner[field] == min(v[field] for v in available)

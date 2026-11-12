@@ -85,7 +85,7 @@ export function ResultsSection({
       </section>
 
       <div className={`space-y-5 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
-        <RecommendationPanel comparison={comparison} />
+        <RecommendationPanel comparison={comparison} transit={transit} />
 
         <section aria-labelledby="variants-title">
           <h2 id="variants-title" className="sr-only">

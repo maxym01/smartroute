@@ -1,6 +1,13 @@
 import type { ModeEstimate, TransportMode } from '../types/api';
+import { formatCo2, formatCost, formatDuration } from './format';
 
 export type MetricKey = 'duration' | 'cost' | 'co2';
+
+/** Metryka, w której wariant jest najlepszy; `sharedWith` ≠ [] oznacza remis (ex aequo). */
+export interface BestMetric {
+  metric: MetricKey;
+  sharedWith: TransportMode[];
+}
 
 const METRIC_VALUE: Record<MetricKey, (variant: ModeEstimate) => number> = {
   duration: (variant) => variant.estimated_duration_min,
@@ -8,22 +15,30 @@ const METRIC_VALUE: Record<MetricKey, (variant: ModeEstimate) => number> = {
   co2: (variant) => variant.estimated_co2_kg,
 };
 
+// Porównujemy wartości tak, jak widzi je użytkownik (np. 13,2 i 13,4 min → „13 min”),
+// żeby oznaczenie „najkrótszy” nigdy nie wyróżniało jednej z dwóch identycznie wyglądających liczb.
+const METRIC_DISPLAY: Record<MetricKey, (value: number) => string> = {
+  duration: formatDuration,
+  cost: formatCost,
+  co2: formatCo2,
+};
+
 /**
  * Wskazuje najlepszą wartość każdej metryki wśród dostępnych wariantów.
  * To wyłącznie opis danych z backendu — o rekomendacji decyduje backend.
  */
-export function bestMetrics(variants: ModeEstimate[]): Map<TransportMode, MetricKey[]> {
+export function bestMetrics(variants: ModeEstimate[]): Map<TransportMode, BestMetric[]> {
   const available = variants.filter((variant) => variant.available);
-  const result = new Map<TransportMode, MetricKey[]>();
+  const result = new Map<TransportMode, BestMetric[]>();
   if (available.length < 2) return result;
   for (const metric of Object.keys(METRIC_VALUE) as MetricKey[]) {
-    const values = available.map(METRIC_VALUE[metric]);
-    const min = Math.min(...values);
-    if (values.every((value) => value === min)) continue; // remis — nic nie wyróżniamy
-    for (const variant of available) {
-      if (METRIC_VALUE[metric](variant) === min) {
-        result.set(variant.mode, [...(result.get(variant.mode) ?? []), metric]);
-      }
+    const shown = (variant: ModeEstimate) => METRIC_DISPLAY[metric](METRIC_VALUE[metric](variant));
+    const best = METRIC_DISPLAY[metric](Math.min(...available.map(METRIC_VALUE[metric])));
+    const leaders = available.filter((variant) => shown(variant) === best);
+    if (leaders.length === available.length) continue; // wszyscy równi — nic nie wyróżniamy
+    for (const variant of leaders) {
+      const sharedWith = leaders.filter((other) => other !== variant).map((other) => other.mode);
+      result.set(variant.mode, [...(result.get(variant.mode) ?? []), { metric, sharedWith }]);
     }
   }
   return result;

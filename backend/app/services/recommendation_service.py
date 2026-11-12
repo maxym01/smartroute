@@ -12,7 +12,8 @@ Algorytm
 3. Priorytety jednokryterialne (``fastest``, ``cheapest``, ``greenest``) porządkują warianty
    leksykograficznie: najpierw metryka główna, potem pozostałe jako dogrywka
    (fastest: czas → koszt → CO₂; cheapest: koszt → czas → CO₂; greenest: CO₂ → czas → koszt).
-   Dzięki temu „najszybszy” zawsze oznacza faktycznie najkrótszy czas.
+   Dzięki temu „najszybszy” zawsze oznacza faktycznie najkrótszy czas. Gdy dwa warianty mają
+   równą metrykę główną, decyduje kolejna metryka, a uzasadnienie mówi o tym wprost.
 4. ``balanced`` liczy wynik ważony::
 
        score = 1/3 · norm_czas + 1/3 · norm_koszt + 1/3 · norm_CO₂     (0..1, mniej = lepiej)
@@ -206,6 +207,8 @@ class RecommendationService:
         sentences = [
             self._headline(priority, winner, balanced[winner.mode], pool, comfort=bool(demoted))
         ]
+        if not tie_break_applied:
+            sentences += self._secondary_tie_sentence(priority, ranked, demoted)
         sentences += [self._versus(winner, other) for other in ranked[1:]]
         if tie_break_applied:
             order = " → ".join(MODE_LABELS[m].lower() for m in TIE_BREAK_ORDER)
@@ -247,6 +250,30 @@ class RecommendationService:
             f"{label} daje najlepszy kompromis czasu, kosztu i emisji{among} "
             f"(wynik {fmt_number(score, 2)} w skali 0–1, im mniej, tym lepiej)."
         )
+
+    @staticmethod
+    def _secondary_tie_sentence(
+        priority: TripPriority, ranked: Sequence[ModeEstimate], demoted: set[TransportMode]
+    ) -> list[str]:
+        """Jawnie opisuje remis w metryce głównej rozstrzygnięty kryterium dodatkowym."""
+        if priority is TripPriority.BALANCED or len(ranked) < 2:
+            return []
+        winner, runner_up = ranked[0], ranked[1]
+        if (runner_up.mode in demoted) != (winner.mode in demoted):
+            return []
+        primary, *secondary = LEXICOGRAPHIC_ORDER[priority]
+        if metric_value(winner, primary) != metric_value(runner_up, primary):
+            return []
+        decisive = next(
+            (m for m in secondary if metric_value(winner, m) != metric_value(runner_up, m)),
+            None,
+        )
+        if decisive is None:  # pełny remis opisuje zdanie o stałej kolejności
+            return []
+        return [
+            f"Taką samą wartość kryterium „{_METRIC_NAMES[primary]}” ma wariant "
+            f"„{runner_up.label}” — rozstrzygnęło kolejne kryterium: {_METRIC_NAMES[decisive]}."
+        ]
 
     @staticmethod
     def _comfort_sentences(
