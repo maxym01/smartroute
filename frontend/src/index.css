@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* Paleta: granat i grafit z turkusowym akcentem. Kontrast tekstu ≥ 4.5:1 na powierzchniach. */
+/* Palette: navy and graphite with a teal accent. Text contrast ≥ 4.5:1 on all surfaces. */
 @theme {
   --font-sans:
     'Inter', 'Segoe UI', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial,
@@ -60,7 +60,7 @@
     background-attachment: fixed;
   }
 
-  /* Widoczny focus dla klawiatury (heurystyka spójności + dostępność). */
+  /* Visible keyboard focus (consistency heuristic + accessibility). */
   :focus-visible {
     outline: 2px solid var(--color-accent-400);
     outline-offset: 2px;

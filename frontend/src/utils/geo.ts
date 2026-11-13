@@ -3,8 +3,8 @@ import type { Stop } from '../types/api';
 const EARTH_RADIUS_KM = 6371;
 
 /**
- * Odległość w linii prostej między przystankami (wzór haversine).
- * To tylko punkt odniesienia — rzeczywista trasa drogowa jest dłuższa.
+ * Straight-line distance between stops (haversine formula).
+ * Only a reference point — the actual road route is longer.
  */
 export function straightLineKm(a: Stop, b: Stop): number | null {
   if (a.stop_lat == null || a.stop_lon == null || b.stop_lat == null || b.stop_lon == null) {

@@ -1,16 +1,16 @@
-"""Deterministyczna korekta wariantu „Rower” na podstawie bieżącej pogody.
+"""Deterministic adjustment of the "Bike" option based on current weather.
 
-Reguły (progi są przyjętymi założeniami MVP, nie normą):
+Rules (the thresholds are MVP assumptions, not a standard):
 
-- opad [mm/h]: ≥ 0,2 → komfort obniżony (``reduced``), ≥ 2,5 → niski (``poor``),
-- burza, śnieg, marznący deszcz (kody Weatherbit 2xx, 511, 6xx) lub opad śniegu > 0 → ``poor``,
-- wiatr [km/h]: ≥ 25 → ``reduced``, ≥ 40 (ok. 6° Beauforta) → ``poor``,
-- temperatura [°C]: ≤ 3 lub ≥ 28 → ``reduced``, ≤ -5 lub ≥ 33 → ``poor``.
+- precipitation [mm/h]: ≥ 0.2 → reduced comfort (``reduced``), ≥ 2.5 → low (``poor``),
+- thunderstorm, snow, freezing rain (Weatherbit codes 2xx, 511, 6xx) or snowfall > 0 → ``poor``,
+- wind [km/h]: ≥ 25 → ``reduced``, ≥ 40 (about 6 on the Beaufort scale) → ``poor``,
+- temperature [°C]: ≤ 3 or ≥ 28 → ``reduced``, ≤ -5 or ≥ 33 → ``poor``.
 
-Wynikowy komfort to najgorszy z czynników. Wiatr dodatkowo wydłuża szacowany czas jazdy
-rowerem: +10% od 25 km/h, +20% od 40 km/h (umiarkowanie — nie znamy kierunku jazdy względem
-wiatru). Pozostałe metryki (koszt, CO₂) ani inne środki transportu nie są zmieniane: nie
-symulujemy korków ani opóźnień komunikacji.
+The resulting comfort is the worst factor. Wind also lengthens the estimated bike travel
+time: +10% from 25 km/h, +20% from 40 km/h (moderate, since the riding direction relative
+to the wind is unknown). The other metrics (cost, CO₂) and the other transport modes are
+not changed: traffic jams and public transport delays are not simulated.
 """
 
 from dataclasses import dataclass, replace
@@ -41,7 +41,7 @@ COMFORT_LABELS = {
 class BikeWeatherAdjustment:
     comfort_level: ComfortLevel
     duration_factor: float
-    reasons: tuple[str, ...]  # puste przy dobrej pogodzie
+    reasons: tuple[str, ...]  # empty in good weather
 
 
 def _worse(a: ComfortLevel, b: ComfortLevel) -> ComfortLevel:
@@ -49,7 +49,7 @@ def _worse(a: ComfortLevel, b: ComfortLevel) -> ComfortLevel:
 
 
 def _is_severe_code(code: int | None) -> bool:
-    # 2xx burza, 511 marznący deszcz, 6xx śnieg / deszcz ze śniegiem (kody Weatherbit).
+    # 2xx thunderstorm, 511 freezing rain, 6xx snow / sleet (Weatherbit codes).
     return code is not None and (200 <= code < 300 or code == 511 or 600 <= code < 700)
 
 
@@ -98,7 +98,7 @@ class WeatherAdjustmentService:
 
     @staticmethod
     def apply(estimate: ModeEstimate, adjustment: BikeWeatherAdjustment) -> ModeEstimate:
-        """Zwraca skorygowany szacunek roweru; inne środki i rower niedostępny — bez zmian."""
+        """Return the adjusted bike estimate; other modes and an unavailable bike are unchanged."""
         if estimate.mode is not TransportMode.BIKE or not estimate.available:
             return estimate
         label = COMFORT_LABELS[adjustment.comfort_level]

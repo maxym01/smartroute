@@ -1,4 +1,4 @@
-"""Wspólne typy kalkulatorów transportu. Moduł nie zależy od FastAPI ani od bazy danych."""
+"""Shared transport calculator types. The module depends on neither FastAPI nor the database."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -12,8 +12,8 @@ MODE_LABELS: dict[TransportMode, str] = {
     TransportMode.BIKE: "Rower",
 }
 
-# Precyzja zaokrągleń wyników. Ranking działa na wartościach zaokrąglonych, czyli tych,
-# które widzi użytkownik — dzięki temu remisy są spójne z tym, co pokazuje API.
+# Rounding precision of the results. The ranking works on rounded values, i.e. the ones
+# the user sees, so ties are consistent with what the API shows.
 DURATION_DECIMALS = 1
 COST_DECIMALS = 2
 CO2_DECIMALS = 3
@@ -21,7 +21,7 @@ CO2_DECIMALS = 3
 
 @dataclass(frozen=True, slots=True)
 class TripInput:
-    """Dane wejściowe porównania, niezależne od modelu ORM."""
+    """Comparison input, independent of the ORM model."""
 
     distance_km: float
     passengers: int = 1
@@ -29,8 +29,8 @@ class TripInput:
     allow_bike: bool = True
     origin: str | None = None
     destination: str | None = None
-    # Opcjonalne dane do rozkładu GTFS. ID przystanku to identyfikator z feedu (stop_id),
-    # a nie tekst origin/destination — nazw miejsc nie zamieniamy na przystanki.
+    # Optional GTFS timetable data. The stop ID is the feed identifier (stop_id), not the
+    # origin/destination text — place names are never converted into stops.
     origin_stop_id: str | None = None
     destination_stop_id: str | None = None
     departure_at: datetime | None = None
@@ -44,7 +44,7 @@ class TripInput:
 
 @dataclass(frozen=True, slots=True)
 class ModeEstimate:
-    """Szacunek dla jednego środka transportu. Koszt i CO₂ dotyczą całej grupy pasażerów."""
+    """Estimate for one transport mode. Cost and CO₂ apply to the whole group of passengers."""
 
     mode: TransportMode
     available: bool
@@ -56,7 +56,7 @@ class ModeEstimate:
     co2_per_passenger_kg: float
     data_source: DataSource
     assumptions: tuple[str, ...] = field(default_factory=tuple)
-    # Ustawiany tylko przez korektę pogodową (obecnie dla roweru); None = nie oceniano.
+    # Set only by the weather adjustment (currently for the bike); None = not assessed.
     comfort_level: ComfortLevel | None = None
 
     @property
@@ -81,5 +81,5 @@ def per_passenger(total: float, passengers: int) -> float:
 
 
 def fmt_number(value: float, decimals: int = 2) -> str:
-    """Formatuje liczbę po polsku (przecinek dziesiętny), np. 4.4 → "4,40"."""
+    """Format a number the Polish way (decimal comma), e.g. 4.4 → "4,40"."""
     return f"{value:.{decimals}f}".replace(".", ",")

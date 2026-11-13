@@ -1,20 +1,20 @@
-"""Import GTFS Static (ZIP z URL lub z dysku) do bazy SQLite rozkładu.
+"""GTFS Static import (ZIP from a URL or from disk) into the SQLite timetable database.
 
-Założenia:
-- **Pamięć:** pliki CSV są czytane strumieniowo prosto z ZIP-a (bez rozpakowywania na dysk)
-  i wstawiane partiami. W pamięci trzymamy tylko słowniki identyfikatorów (przystanki, kursy,
-  usługi), a nie stop_times.
-- **Transakcja:** cały import (DROP + CREATE + INSERT) to jedna transakcja SQLite. Błąd w trakcie
-  oznacza ROLLBACK, a poprzedni rozkład zostaje nietknięty. Dzięki WAL API czyta stare dane do
-  chwili COMMIT. Ponowny import w całości zastępuje poprzedni.
-- **Bezpieczny ZIP:** czytamy wyłącznie znane pliki z katalogu głównego archiwum (nic nie jest
-  rozpakowywane, więc nie ma ryzyka zip-slip), odrzucamy pliki zaszyfrowane, zbyt duże
-  i o podejrzanym współczynniku kompresji (zip bomb). ``zipfile`` nie odczyta więcej bajtów niż
-  zadeklarowany rozmiar, więc limit dotyczy faktycznie przeczytanych danych.
-- **Kalendarz:** obsługiwane są calendar.txt i/lub calendar_dates.txt (ZTM Gdańsk publikuje
-  tylko calendar_dates.txt z ``exception_type=1``).
-- **Wadliwe wiersze** (zły format czasu, nieznany kurs/przystanek itp.) są pomijane i liczone
-  w raporcie. Brak wymaganego pliku lub kolumny przerywa import.
+Design:
+- **Memory:** CSV files are streamed straight from the ZIP (nothing is extracted to disk)
+  and inserted in batches. Only identifier maps (stops, trips, services) are kept in
+  memory, not stop_times.
+- **Transaction:** the whole import (DROP + CREATE + INSERT) is a single SQLite transaction.
+  An error means ROLLBACK and the previous timetable stays intact. Thanks to WAL the API
+  reads the old data until COMMIT. A re-import fully replaces the previous one.
+- **Safe ZIP:** only known files in the archive root are read (nothing is extracted, so
+  there is no zip-slip risk); encrypted, oversized and suspiciously compressed files
+  (zip bombs) are rejected. ``zipfile`` never reads more bytes than the declared size,
+  so the limit applies to the data actually read.
+- **Calendar:** calendar.txt and/or calendar_dates.txt are supported (ZTM Gdańsk publishes
+  only calendar_dates.txt with ``exception_type=1``).
+- **Malformed rows** (bad time format, unknown trip/stop etc.) are skipped and counted
+  in the report. A missing required file or column aborts the import.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ from app.services.gtfs.time_utils import (
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 10_000
-MAX_MEMBER_BYTES = 1024 * 1024 * 1024  # 1 GiB po rozpakowaniu na plik
+MAX_MEMBER_BYTES = 1024 * 1024 * 1024  # 1 GiB uncompressed per file
 MAX_COMPRESSION_RATIO = 100
 MAX_WARNINGS = 20
 USER_AGENT = "SmartRoute-GTFS-Importer/0.1"
@@ -91,7 +91,7 @@ WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 
 
 class GtfsImportError(Exception):
-    """Błąd, który przerywa import (poprzednie dane pozostają bez zmian)."""
+    """Error that aborts the import (the previous data stays unchanged)."""
 
 
 @dataclass
@@ -116,7 +116,7 @@ class ImportReport:
             self.warnings.append(f"{file}: {message}")
 
 
-# --- Źródło: URL albo plik ------------------------------------------------------------------
+# --- Source: URL or file ---------------------------------------------------------------------
 
 
 def is_url(source: str) -> bool:
@@ -158,18 +158,18 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-# --- ZIP i CSV ------------------------------------------------------------------------------
+# --- ZIP and CSV ----------------------------------------------------------------------------
 
 
 class GtfsArchive:
-    """Bezpieczny dostęp tylko do znanych plików GTFS w katalogu głównym archiwum."""
+    """Safe access limited to known GTFS files in the archive root."""
 
     def __init__(self, path: Path, *, max_member_bytes: int = MAX_MEMBER_BYTES) -> None:
         if not zipfile.is_zipfile(path):
             raise GtfsImportError(f"{path} nie jest prawidłowym archiwum ZIP")
         self.zip = zipfile.ZipFile(path)
         known = set(REQUIRED_COLUMNS) | set(OPTIONAL_FILES)
-        # Tylko nazwy bez katalogów — "../stops.txt" czy "x/stops.txt" są ignorowane.
+        # Names without directories only — "../stops.txt" or "x/stops.txt" are ignored.
         self.members = {
             info.filename: info for info in self.zip.infolist() if info.filename in known
         }
@@ -202,7 +202,7 @@ class GtfsArchive:
             return [column.strip() for column in next(csv.reader(f), [])]
 
     def rows(self, name: str) -> Iterator[tuple[int, dict[str, str]]]:
-        """Wiersze jako słowniki (nr linii, dane). Wartości przycięte; brak kolumny → ""."""
+        """Rows as dicts (line number, data). Values are stripped; a missing column → ""."""
         with self._text(name) as f:
             reader = csv.reader(f)
             header = [column.strip() for column in next(reader, [])]
@@ -218,7 +218,7 @@ class GtfsArchive:
                 )
 
     def _text(self, name: str) -> io.TextIOWrapper:
-        # utf-8-sig: toleruje BOM; newline="" — csv sam obsługuje CRLF.
+        # utf-8-sig: tolerates a BOM; newline="" — csv handles CRLF itself.
         return io.TextIOWrapper(self.zip.open(self.members[name]), encoding="utf-8-sig", newline="")
 
 
@@ -331,10 +331,10 @@ def _import_into(conn: Connection, archive: GtfsArchive, report: ImportReport) -
     _read_timezone(archive, report)
     feed_start, feed_end = _read_feed_validity(archive)
 
-    # Atomowa podmiana: stare tabele znikają dopiero przy COMMIT.
+    # Atomic swap: the old tables disappear only at COMMIT.
     GtfsBase.metadata.drop_all(conn)
     GtfsBase.metadata.create_all(conn)
-    # Indeks pomocniczy budujemy po wstawieniu danych — tak jest wielokrotnie szybciej.
+    # The helper index is built after inserting the data — this is many times faster.
     deferred_indexes = list(GtfsStopTime.__table__.indexes)
     for index in deferred_indexes:
         index.drop(conn)
@@ -347,7 +347,7 @@ def _import_into(conn: Connection, archive: GtfsArchive, report: ImportReport) -
             if not row["stop_id"] or not row["stop_name"]:
                 raise ValueError("brak stop_id lub stop_name")
             if row.get("location_type", "") not in ("", "0"):
-                continue  # stacje/wejścia — połączenia dotyczą tylko słupków (location_type=0)
+                continue  # stations/entrances: connections use stop points only (location_type=0)
             if row["stop_id"] in stop_ids:
                 raise ValueError(f"zduplikowany stop_id {row['stop_id']}")
             stops.add(
@@ -385,7 +385,7 @@ def _import_into(conn: Connection, archive: GtfsArchive, report: ImportReport) -
             report.skip("routes.txt", f"linia {line}: {exc}")
     routes.flush()
 
-    # kalendarz
+    # calendar
     service_dates = _load_service_dates(archive, report)
     active_services = {service_id for service_id, _ in service_dates}
     dates_table = _BatchInserter(conn, GtfsServiceDate.__table__)
@@ -403,7 +403,7 @@ def _import_into(conn: Connection, archive: GtfsArchive, report: ImportReport) -
             if row["route_id"] not in route_ids:
                 raise ValueError(f"nieznana linia route_id={row['route_id']}")
             if row["service_id"] not in active_services:
-                # Kurs bez żadnego dnia kursowania nie wpływa na wyniki — pomijamy.
+                # A trip without any service day cannot affect results — skip it.
                 report.skip("trips.txt", f"linia {line}: usługa bez dni kursowania")
                 continue
             pk = len(trip_pks) + 1
@@ -422,10 +422,10 @@ def _import_into(conn: Connection, archive: GtfsArchive, report: ImportReport) -
             report.skip("trips.txt", f"linia {line}: {exc}")
     trips.flush()
 
-    # stop_times (największy plik — strumieniowo)
-    # Duplikaty (trip, stop_sequence) wykrywamy w obrębie bieżącego kursu (pliki zwykle są
-    # pogrupowane po trip_id); rzadkie duplikaty rozproszone odrzuci INSERT OR IGNORE na PK.
-    # Globalny zbiór dla milionów wierszy zużywałby setki MB pamięci.
+    # stop_times (the largest file — streamed)
+    # Duplicate (trip, stop_sequence) pairs are detected within the current trip (files are
+    # usually grouped by trip_id); rare scattered duplicates are dropped by INSERT OR IGNORE
+    # on the PK. A global set for millions of rows would use hundreds of MB of memory.
     stop_times = _BatchInserter(conn, GtfsStopTime.__table__, or_ignore=True)
     current_trip: int | None = None
     seen: set[int] = set()
@@ -473,7 +473,7 @@ def _import_into(conn: Connection, archive: GtfsArchive, report: ImportReport) -
     for index in deferred_indexes:
         index.create(conn)
 
-    # INSERT OR IGNORE mógł odrzucić duplikaty — liczymy faktycznie zapisane wiersze.
+    # INSERT OR IGNORE may have dropped duplicates — count the rows actually written.
     stop_times_saved = conn.scalar(select(func.count()).select_from(GtfsStopTime.__table__)) or 0
     dates = [day for _, day in service_dates]
     report.valid_from = feed_start or (min(dates) if dates else None)
@@ -513,7 +513,7 @@ def import_zip(
     source: str | None = None,
     max_member_bytes: int = MAX_MEMBER_BYTES,
 ) -> ImportReport:
-    """Importuje lokalny ZIP do bazy ``engine`` w jednej transakcji."""
+    """Import a local ZIP into the ``engine`` database in a single transaction."""
     started = time.perf_counter()
     report = ImportReport(source=source or str(zip_path))
     report.sha256 = sha256_of(zip_path)
@@ -535,7 +535,7 @@ def import_gtfs(
     max_download_mb: int = 200,
     progress: Callable[[str], None] | None = None,
 ) -> ImportReport:
-    """Importuje z URL (pobiera do pliku tymczasowego) albo ze ścieżki do lokalnego ZIP-a."""
+    """Import from a URL (downloaded to a temporary file) or from a local ZIP path."""
     say = progress or logger.info
     engine = build_gtfs_engine(database_url)
     try:

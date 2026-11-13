@@ -33,12 +33,12 @@ class Trip(Base):
     has_car: Mapped[bool] = mapped_column(default=True)
     allow_bike: Mapped[bool] = mapped_column(default=True)
     notes: Mapped[str | None] = mapped_column(String(500), default=None)
-    # Opcjonalne dane rozkładowe (GTFS). Kolumny nullable — dodawane do istniejących baz
-    # przez app.db.migrations bez utraty danych.
+    # Optional timetable (GTFS) data. Nullable columns, added to existing databases
+    # by app.db.migrations without data loss.
     origin_stop_id: Mapped[str | None] = mapped_column(String(64), default=None)
     destination_stop_id: Mapped[str | None] = mapped_column(String(64), default=None)
     departure_at: Mapped[datetime | None] = mapped_column(UTCDateTime, default=None)
-    # SQLite CURRENT_TIMESTAMP zwraca czas UTC (bez strefy) — strefę dokłada schemat TripRead.
+    # SQLite CURRENT_TIMESTAMP returns naive UTC; the TripRead schema attaches the time zone.
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

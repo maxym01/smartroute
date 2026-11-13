@@ -1,10 +1,10 @@
-"""CLI rozkładu GTFS.
+"""GTFS timetable CLI.
 
-Uruchamiaj z katalogu ``backend`` (tam leży ``.env`` i domyślna baza ``gtfs.db``)::
+Run from the ``backend`` directory (where ``.env`` and the default ``gtfs.db`` live)::
 
-    python -m app.cli.gtfs import                    # oficjalny URL ZTM Gdańsk (GTFS_FEED_URL)
-    python -m app.cli.gtfs import --source plik.zip  # lokalny ZIP
-    python -m app.cli.gtfs info                      # stan zaimportowanego rozkładu
+    python -m app.cli.gtfs import                    # official ZTM Gdańsk URL (GTFS_FEED_URL)
+    python -m app.cli.gtfs import --source file.zip  # local ZIP
+    python -m app.cli.gtfs info                      # state of the imported timetable
 """
 
 import argparse

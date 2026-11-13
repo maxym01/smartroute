@@ -44,7 +44,7 @@ export const COMFORT_LABELS: Record<ComfortLevel, string> = {
 
 export type RouteKind = 'Tramwaj' | 'Autobus' | 'Pociąg' | 'Linia';
 
-/** Typy tras GTFS (podstawowe i rozszerzone). */
+/** GTFS route types (basic and extended). */
 export function routeTypeLabel(routeType: number): RouteKind {
   if (routeType === 0 || (routeType >= 900 && routeType < 1000)) return 'Tramwaj';
   if (routeType === 3 || (routeType >= 700 && routeType < 800)) return 'Autobus';

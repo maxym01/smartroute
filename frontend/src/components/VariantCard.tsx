@@ -23,11 +23,11 @@ interface VariantCardProps {
   variant: ModeEstimate;
   passengers: number;
   isRecommended: boolean;
-  /** Liczba dostępnych wariantów (do „Miejsce 2 z 3”). */
+  /** Number of available options (for "Miejsce 2 z 3", i.e. "rank 2 of 3"). */
   rankedCount: number;
-  /** Metryki, w których wariant wypada najlepiej spośród dostępnych (z informacją o remisie). */
+  /** Metrics in which this option is the best among the available ones (with tie information). */
   bestIn: BestMetric[];
-  /** Tylko dla komunikacji miejskiej: zgodność z panelem rozkładu GTFS. */
+  /** Public transport only: consistency with the GTFS timetable panel. */
   transit?: TransitStatus;
 }
 
@@ -73,7 +73,7 @@ const BEST_LABELS: Record<MetricKey, string> = {
   co2: 'najniższa',
 };
 
-/** „najkrótszy” albo „najkrótszy ex aequo”, gdy inny wariant ma tę samą (wyświetlaną) wartość. */
+/** "najkrótszy" (shortest), or "najkrótszy ex aequo" when another option has the same displayed value. */
 function bestLabel(bestIn: BestMetric[], metric: MetricKey): string | undefined {
   const best = bestIn.find((item) => item.metric === metric);
   if (!best) return undefined;
@@ -86,7 +86,7 @@ const COMFORT_STYLES = {
   poor: 'text-rose-300',
 } as const;
 
-/** Pochodzenie czasu komunikacji miejskiej — rozkład vs szacunek (problem z ręcznych testów). */
+/** Origin of the public transport time — timetable vs estimate (an issue found in manual testing). */
 function TransitNote({ status }: { status: TransitStatus }) {
   if (status.kind === 'confirmed') {
     const { connection } = status;

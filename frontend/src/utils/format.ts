@@ -1,4 +1,4 @@
-/** Spójne formatowanie wartości dla polskiego użytkownika (heurystyki 2 i 4). */
+/** Consistent value formatting for Polish users (heuristics 2 and 4). */
 
 export const LOCAL_TIME_ZONE = 'Europe/Warsaw';
 const LOCALE = 'pl-PL';
@@ -43,7 +43,7 @@ export function formatCost(pln: number): string {
   return currency.format(pln);
 }
 
-/** Emisja w kg CO₂; bardzo małe niezerowe wartości z 3 miejscami po przecinku. */
+/** Emissions in kg CO₂; very small non-zero values get 3 decimal places. */
 export function formatCo2(kg: number): string {
   const digits = kg !== 0 && Math.abs(kg) < 0.01 ? 3 : 2;
   return `${formatNumber(kg, digits, kg === 0 ? 0 : digits)} kg CO₂`;
@@ -53,12 +53,12 @@ export function formatDistance(km: number): string {
   return `${formatNumber(km, 1)} km`;
 }
 
-/** Godzina w czasie lokalnym Gdańska, np. „18:57”. */
+/** Time of day in Gdańsk local time, e.g. "18:57". */
 export function formatTime(iso: string): string {
   return timeFormat.format(new Date(iso));
 }
 
-/** np. „czw., 12 listopada, 18:54”. */
+/** e.g. "czw., 12 listopada, 18:54". */
 export function formatDateTime(iso: string): string {
   return dateTimeFormat.format(new Date(iso));
 }

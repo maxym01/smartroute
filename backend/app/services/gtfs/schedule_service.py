@@ -1,4 +1,4 @@
-"""Wyszukiwanie bezpośrednich połączeń w rozkładzie GTFS (bez przesiadek, bez realtime)."""
+"""Direct connection search in the GTFS timetable (no transfers, no real-time data)."""
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -53,7 +53,7 @@ class ConnectionSearch:
     feed: GtfsFeed
     origin: GtfsStop
     destination: GtfsStop
-    departure_at: datetime  # w strefie feedu
+    departure_at: datetime  # in the feed's time zone
     window_min: int
     connections: tuple[Connection, ...]
     notes: tuple[str, ...]
@@ -91,9 +91,9 @@ class ScheduleService:
         start = as_local_aware(departure_at).astimezone(tz)
         end = start + timedelta(minutes=window_min)
 
-        # Kurs z dnia D może odjeżdżać po północy (czas >= 24:00), więc sprawdzamy też
-        # odpowiednią liczbę dni wstecz (np. ZTM Gdańsk: do ~29:30 → 1 dzień). Margines ±1 dnia
-        # pokrywa dni zmiany czasu, gdy „południe minus 12 h” nie wypada o północy.
+        # A trip from day D may depart after midnight (time >= 24:00), so the matching number
+        # of previous days is checked too (e.g. ZTM Gdańsk: up to ~29:30 → 1 day). The ±1 day
+        # margin covers DST change days, when "noon minus 12 h" is not at midnight.
         days_back = feed.max_time_secs // 86400
         day = start.date() - timedelta(days=days_back + 1)
         last_day = end.date() + timedelta(days=1)
@@ -136,7 +136,7 @@ class ScheduleService:
             service_date=date_to_int(day),
             min_departure_secs=max(low, 0),
             max_departure_secs=high,
-            limit=limit * 2,  # zapas na duplikaty z pętli
+            limit=limit * 2,  # headroom for duplicates from loop trips
         )
         return [_to_connection(ride, day, tz) for ride in rides]
 

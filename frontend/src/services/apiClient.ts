@@ -1,20 +1,20 @@
 import type { ApiErrorBody, ValidationIssue } from '../types/api';
 
-/** Domyślnie względny adres — w trybie dev obsługuje go proxy Vite (vite.config.ts). */
+/** Relative URL by default — in dev mode the Vite proxy handles it (vite.config.ts). */
 export const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(
   /\/$/,
   '',
 );
 
 export type ApiErrorKind =
-  | 'network' // brak połączenia z backendem
+  | 'network' // no connection to the backend
   | 'validation' // 422
   | 'not_found' // 404
-  | 'gtfs_not_imported' // 503 z backendu
-  | 'server' // inne 5xx
+  | 'gtfs_not_imported' // 503 from the backend
+  | 'server' // other 5xx
   | 'unknown';
 
-/** Błąd API z kodem z backendu i — dla 422 — listą problemów walidacji. */
+/** API error with the backend code and, for 422, the list of validation issues. */
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | null;
@@ -54,7 +54,7 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 
 function toApiError(status: number, body: unknown): ApiError {
   if (!isErrorBody(body)) {
-    // Proxy Vite zwraca 5xx bez JSON-a, gdy backend nie działa.
+    // The Vite proxy returns a 5xx without JSON when the backend is down.
     if (status >= 500) {
       return new ApiError('network', 'Backend nie odpowiada.', status);
     }

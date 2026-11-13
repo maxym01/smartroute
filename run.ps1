@@ -1,22 +1,22 @@
 ﻿<#
 .SYNOPSIS
-    Uruchamia backend SmartRoute (FastAPI + Uvicorn) z interpretera w .venv.
+    Starts the SmartRoute backend (FastAPI + Uvicorn) with the .venv interpreter.
 
 .DESCRIPTION
-    Katalogiem roboczym procesu jest backend\, dzięki czemu:
-      - pakiet "app" jest importowalny,
-      - wczytywany jest plik backend\.env,
-      - domyślna baza SQLite (sqlite:///./smartroute.db) powstaje w backend\smartroute.db.
-    Tabele są tworzone automatycznie przy starcie aplikacji.
+    The process working directory is backend\, so that:
+      - the "app" package is importable,
+      - the backend\.env file is loaded,
+      - the default SQLite database (sqlite:///./smartroute.db) is created in backend\smartroute.db.
+    Tables are created automatically when the application starts.
 
 .PARAMETER Port
-    Port HTTP (domyślnie 8000).
+    HTTP port (default 8000).
 
 .PARAMETER BindHost
-    Adres nasłuchu (domyślnie 127.0.0.1 - tylko lokalnie).
+    Listen address (default 127.0.0.1 - local only).
 
 .PARAMETER NoReload
-    Wyłącza automatyczne przeładowanie po zmianie kodu.
+    Disables automatic reload on code changes.
 
 .EXAMPLE
     .\run.ps1

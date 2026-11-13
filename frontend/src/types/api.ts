@@ -1,6 +1,6 @@
 /**
- * Typy odwzorowujące kontrakt API backendu (schematy Pydantic w backend/app/schemas).
- * Zmiana schematu po stronie backendu wymaga aktualizacji tego pliku.
+ * Types mirroring the backend API contract (Pydantic schemas in backend/app/schemas).
+ * Any backend schema change requires updating this file.
  */
 
 // app/core/enums.py
@@ -29,7 +29,7 @@ export interface TripCreate {
   notes?: string | null;
   origin_stop_id?: string | null;
   destination_stop_id?: string | null;
-  /** ISO 8601; data bez strefy = czas lokalny Europe/Warsaw. */
+  /** ISO 8601; a date without a time zone = Europe/Warsaw local time. */
   departure_at?: string | null;
 }
 
@@ -78,7 +78,7 @@ export interface Connection {
   trip_id: string;
   route_id: string;
   line: string;
-  /** Typ GTFS, np. 3/700 autobus, 0/900 tramwaj. */
+  /** GTFS route type, e.g. 3/700 bus, 0/900 tram. */
   route_type: number;
   headsign: string | null;
   direction_id: number | null;
@@ -125,7 +125,7 @@ export interface ModeEstimate {
   is_estimate: true;
   data_source: DataSource;
   assumptions: string[];
-  /** null dla wariantu niedostępnego. */
+  /** null for an unavailable option. */
   score: ModeScore | null;
   comfort_level: ComfortLevel | null;
 }
@@ -147,7 +147,7 @@ export interface ScoringMethod {
 
 export interface WeatherConditions {
   source: 'weatherbit_current';
-  /** Czas obserwacji (UTC). */
+  /** Observation time (UTC). */
   observed_at: string | null;
   temperature_c: number;
   precipitation_mm_h: number;
@@ -190,7 +190,7 @@ export interface ComparisonResponse {
   variants: ModeEstimate[];
   recommendation: Recommendation;
   scoring: ScoringMethod;
-  /** null = pogody nie oceniano. */
+  /** null = weather not assessed. */
   weather: Weather | null;
 }
 
@@ -203,7 +203,7 @@ export interface HealthResponse {
   database: 'ok' | 'error';
 }
 
-// app/core/exceptions.py — spójny format błędów {detail, code}
+// app/core/exceptions.py — consistent {detail, code} error format
 export interface ValidationIssue {
   loc: (string | number)[];
   msg: string;

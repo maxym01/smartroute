@@ -1,6 +1,6 @@
 import { Bike, Bus, Car } from 'lucide-react';
 
-/** Krótki stan początkowy: bez fikcyjnych wyników i bez rozbudowanej instrukcji. */
+/** Short initial state: no fake results and no lengthy instructions. */
 export function EmptyState() {
   return (
     <section

@@ -52,12 +52,12 @@ def test_service_day_reference_is_local_midnight_on_normal_day() -> None:
 
 
 def test_service_day_reference_on_dst_change_is_noon_minus_12h() -> None:
-    # 29.03.2026: zmiana czasu na letni. Południe CEST = 10:00 UTC → odniesienie 22:00 UTC dnia
-    # poprzedniego (czyli 23:00 CET), a nie lokalna północ.
+    # 29.03.2026: switch to summer time. Noon CEST = 10:00 UTC → reference 22:00 UTC the
+    # previous day (i.e. 23:00 CET), not local midnight.
     assert service_day_reference(date(2026, 3, 29), LOCAL_TIMEZONE) == datetime(
         2026, 3, 28, 22, 0, tzinfo=UTC
     )
-    # 08:00:00 w rozkładzie tego dnia to nadal 08:00 czasu lokalnego (CEST).
+    # 08:00:00 in that day's timetable is still 08:00 local time (CEST).
     assert gtfs_time_to_datetime(date(2026, 3, 29), 8 * 3600, LOCAL_TIMEZONE) == datetime(
         2026, 3, 29, 8, 0, tzinfo=LOCAL_TIMEZONE
     )

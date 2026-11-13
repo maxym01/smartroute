@@ -11,7 +11,7 @@ interface StopPickerProps {
   label: string;
   value: Stop | null;
   onChange: (stop: Stop | null) => void;
-  /** Przystanek wybrany w drugim polu — nie można go wybrać ponownie (heurystyka 5). */
+  /** Stop selected in the other field — it cannot be selected again (heuristic 5). */
   excludeStopId?: string;
   error?: string;
   placeholder?: string;
@@ -19,8 +19,8 @@ interface StopPickerProps {
 }
 
 /**
- * Wyszukiwarka przystanków GTFS w układzie ARIA combobox (strzałki, Enter, Escape).
- * Po wyborze pokazuje nazwę przystanku zamiast identyfikatora (heurystyki 2 i 6).
+ * GTFS stop search as an ARIA combobox (arrow keys, Enter, Escape).
+ * After selection it shows the stop name instead of the identifier (heuristics 2 and 6).
  */
 export function StopPicker({
   id,
@@ -51,7 +51,7 @@ export function StopPicker({
     setOpen(false);
     setQuery('');
     setActiveIndex(-1);
-    // Focus na przycisk „Zmień”, aby użytkownik klawiatury nie stracił pozycji.
+    // Focus the "Zmień" (change) button so keyboard users keep their place.
     requestAnimationFrame(() => changeButtonRef.current?.focus());
   };
 
@@ -201,7 +201,7 @@ export function StopPicker({
                   role="option"
                   aria-selected={index === activeIndex}
                   aria-disabled={excluded || undefined}
-                  // onMouseDown zamiast onClick: wybór przed utratą focusu (onBlur zamyka listę).
+                  // onMouseDown instead of onClick: select before focus is lost (onBlur closes the list).
                   onMouseDown={(event) => {
                     event.preventDefault();
                     select(stop);

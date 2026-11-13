@@ -4,7 +4,7 @@ import { getHealth } from '../services/smartrouteApi';
 
 export type BackendStatus = 'checking' | 'online' | 'degraded' | 'offline';
 
-/** Sprawdza dostępność backendu przy starcie i na żądanie (heurystyki 1 i 9). */
+/** Checks backend availability at startup and on demand (heuristics 1 and 9). */
 export function useBackendHealth() {
   const [status, setStatus] = useState<BackendStatus>('checking');
   const [attempt, setAttempt] = useState(0);
@@ -24,7 +24,7 @@ export function useBackendHealth() {
     setAttempt((value) => value + 1);
   }, []);
 
-  /** Pozwala oznaczyć backend jako dostępny/niedostępny na podstawie innych żądań. */
+  /** Lets other requests mark the backend as available/unavailable. */
   const report = useCallback((online: boolean) => setStatus(online ? 'online' : 'offline'), []);
 
   return { status, retry, report };

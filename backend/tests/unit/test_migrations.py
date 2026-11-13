@@ -5,7 +5,7 @@ from sqlalchemy import inspect, text
 from app.db.migrations import upgrade_schema
 from app.db.session import build_engine
 
-# Schemat tabeli trips sprzed etapu 4 (bez kolumn GTFS).
+# Schema of the trips table before the GTFS columns were added.
 LEGACY_TRIPS_DDL = """
 CREATE TABLE trips (
     id INTEGER NOT NULL PRIMARY KEY,
@@ -43,7 +43,7 @@ def test_upgrade_adds_columns_without_losing_data(tmp_path: Path) -> None:
     with engine.connect() as conn:
         row = conn.execute(text("SELECT name, origin, passengers, departure_at FROM trips")).one()
     assert tuple(row) == ("Sopot", "Gdańsk", 2, None)
-    assert upgrade_schema(engine) == []  # idempotentna
+    assert upgrade_schema(engine) == []  # idempotent
     engine.dispose()
 
 

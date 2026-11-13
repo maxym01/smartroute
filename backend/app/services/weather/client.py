@@ -1,17 +1,18 @@
-"""Klient Weatherbit Current Weather API (``GET /v2.0/current``) z cache TTL.
+"""Weatherbit Current Weather API client (``GET /v2.0/current``) with a TTL cache.
 
-Zasady:
+Rules:
 
-- klucz API pochodzi wyłącznie z konfiguracji (``WEATHERBIT_API_KEY``) i nigdy nie trafia do logów
-  ani komunikatów błędów (wyjątki HTTP są tłumione ``from None``, bo ich URL zawiera klucz);
-- zapytanie zawsze z ``units=M`` (metryczne): temperatura w °C, wiatr w m/s, opady w mm/h —
-  wiatr przeliczamy na km/h;
-- odczyt dla danej komórki siatki (~0,1°, czyli kilka km) jest pamiętany ``cache_ttl_s`` sekund,
-  a po błędzie (timeout, 429, brak sieci, odrzucony klucz) klient przez ``error_cooldown_s``
-  sekund nie wysyła kolejnych zapytań — chroni to dzienny limit darmowego planu;
-- każdy problem kończy się ``WeatherUnavailableError`` z polskim, bezpiecznym opisem.
+- the API key comes only from the settings (``WEATHERBIT_API_KEY``) and never reaches logs
+  or error messages (HTTP exceptions are suppressed with ``from None`` because their URL
+  contains the key);
+- requests always use ``units=M`` (metric): temperature in °C, wind in m/s, precipitation
+  in mm/h; wind is converted to km/h;
+- a reading for a grid cell (~0.1°, i.e. a few km) is cached for ``cache_ttl_s`` seconds,
+  and after an error (timeout, 429, no network, rejected key) the client sends no further
+  requests for ``error_cooldown_s`` seconds, which protects the free plan's daily quota;
+- every problem ends in ``WeatherUnavailableError`` with a safe, Polish-language message.
 
-Używamy ``urllib`` z biblioteki standardowej, żeby nie dodawać zależności uruchomieniowej.
+The standard library's ``urllib`` is used to avoid adding a runtime dependency.
 """
 
 import json
@@ -27,17 +28,17 @@ from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
-# Rozdzielczość klucza cache [stopnie]. Bieżąca pogoda nie różni się istotnie w obrębie
-# kilku kilometrów, a grubsza siatka oznacza mniej zapytań do API.
+# Cache key resolution [degrees]. Current weather does not differ much within a few
+# kilometres, and a coarser grid means fewer API requests.
 GRID_DECIMALS = 1
 MS_TO_KMH = 3.6
 
-# (url, timeout_s) -> treść odpowiedzi. Domyślnie urllib; w testach podmieniany.
+# (url, timeout_s) -> response body. urllib by default; replaced in tests.
 Fetcher = Callable[[str, float], bytes]
 
 
 class WeatherUnavailableError(Exception):
-    """Pogoda niedostępna. ``reason`` jest bezpieczny do pokazania użytkownikowi."""
+    """Weather unavailable. ``reason`` is safe to show to the user."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
@@ -46,16 +47,16 @@ class WeatherUnavailableError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class WeatherObservation:
-    """Bieżąca obserwacja w jednostkach znormalizowanych."""
+    """Current observation in normalized units."""
 
     temperature_c: float
-    precipitation_mm_h: float  # opad (ekwiwalent wody), mm/h
-    snowfall_mm_h: float  # opad śniegu, mm/h
+    precipitation_mm_h: float  # precipitation (water equivalent), mm/h
+    snowfall_mm_h: float  # snowfall, mm/h
     wind_speed_kmh: float
     weather_code: int | None
     description: str | None
     observed_at: datetime | None  # UTC
-    lat: float  # współrzędne zapytania (środek komórki siatki)
+    lat: float  # request coordinates (centre of the grid cell)
     lon: float
 
 
@@ -68,7 +69,7 @@ def _urllib_fetch(url: str, timeout_s: float) -> bytes:
         url, headers={"Accept": "application/json", "User-Agent": "SmartRoute/0.1"}
     )
     with urllib.request.urlopen(request, timeout=timeout_s) as response:  # noqa: S310
-        if response.status == 204:  # Weatherbit: brak danych dla lokalizacji
+        if response.status == 204:  # Weatherbit: no data for the location
             return b""
         return response.read()
 
@@ -83,7 +84,7 @@ def _number(record: dict[str, object], key: str, *, required: bool) -> float:
 
 
 def parse_current(payload: object, lat: float, lon: float) -> WeatherObservation:
-    """Parsuje odpowiedź ``/current`` (``{"data": [{...}], "count": 1}``) przy ``units=M``."""
+    """Parse a ``/current`` response (``{"data": [{...}], "count": 1}``) with ``units=M``."""
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list) or not data or not isinstance(data[0], dict):
         raise WeatherUnavailableError("Weatherbit nie zwrócił danych dla tej lokalizacji.")
@@ -137,9 +138,9 @@ class WeatherbitClient:
         self._cache: dict[tuple[float, float], tuple[float, WeatherObservation]] = {}
         self._cooldown_until = 0.0
         self._cooldown_reason = ""
-        # Jedna blokada: równoległe porównania dla tej samej lokalizacji nie wyślą dwóch zapytań.
+        # A single lock: parallel comparisons for the same location will not send two requests.
         self._lock = threading.Lock()
-        self.requests_sent = 0  # licznik do diagnostyki i testów
+        self.requests_sent = 0  # counter for diagnostics and tests
 
     @property
     def enabled(self) -> bool:
@@ -176,10 +177,10 @@ class WeatherbitClient:
         try:
             body = self._fetch(url, self._timeout_s)
         except urllib.error.HTTPError as exc:
-            # ``from None``: obiekt wyjątku zawiera URL z kluczem — nie wiążemy go w traceback.
+            # ``from None``: the exception holds the URL with the key — keep it out of tracebacks.
             raise WeatherUnavailableError(_http_reason(exc.code)) from None
         except (urllib.error.URLError, OSError) as exc:
-            # Timeout przy łączeniu urllib opakowuje w URLError(reason=TimeoutError).
+            # urllib wraps a connect timeout in URLError(reason=TimeoutError).
             reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
             if isinstance(reason, TimeoutError):
                 message = f"Weatherbit nie odpowiedział w ciągu {self._timeout_s:g} s."

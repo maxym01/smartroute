@@ -70,7 +70,7 @@ const TOPICS: { title: string; body: ReactNode }[] = [
   },
 ];
 
-/** Pomoc i dokumentacja (heurystyka 10): pod głównym obszarem, w zwiniętych akordeonach. */
+/** Help and documentation (heuristic 10): below the main area, in collapsed accordions. */
 export function HelpPanel() {
   return (
     <section id="pomoc" aria-labelledby="help-title" className="scroll-mt-6">

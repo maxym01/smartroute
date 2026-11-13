@@ -1,7 +1,7 @@
 import type { Stop, TripCreate, TripPriority } from '../types/api';
 import { compareLocal, isValidDate, isValidTime, nowInGdansk, toBackendDateTime } from './datetime';
 
-/** Ograniczenia zgodne z app/schemas/trip.py. */
+/** Limits matching app/schemas/trip.py. */
 export const LIMITS = {
   nameMax: 100,
   distanceMax: 1000,
@@ -15,7 +15,7 @@ export interface TripFormValues {
   destination: Stop | null;
   date: string;
   time: string;
-  /** Tekst z pola — walidowany i zamieniany na liczbę przy wysyłce. */
+  /** Raw field text — validated and converted to a number on submit. */
   distanceKm: string;
   passengers: string;
   priority: TripPriority;
@@ -33,7 +33,7 @@ export type TripFormField =
   | 'passengers';
 export type TripFormErrors = Partial<Record<TripFormField, string>>;
 
-/** Kolejność pól w formularzu — dla podsumowania błędów i ustawiania focusu. */
+/** Field order in the form — for the error summary and focus handling. */
 export const FIELD_ORDER: TripFormField[] = [
   'origin',
   'destination',
@@ -54,7 +54,7 @@ export const FIELD_LABELS: Record<TripFormField, string> = {
   passengers: 'Pasażerowie',
 };
 
-/** Id elementu formularza dla danego pola (focus z podsumowania błędów). */
+/** Form element id for a given field (focus from the error summary). */
 export const FIELD_IDS: Record<TripFormField, string> = {
   name: 'trip-name',
   origin: 'origin-stop',
@@ -81,7 +81,7 @@ export function defaultFormValues(now: Date = new Date()): TripFormValues {
   };
 }
 
-/** Akceptuje przecinek dziesiętny („5,5”). Zwraca NaN dla niepoprawnego tekstu. */
+/** Accepts a decimal comma ("5,5"). Returns NaN for invalid text. */
 export function parseDecimal(value: string): number {
   const normalized = value.trim().replace(',', '.');
   if (!/^\d+(\.\d+)?$/.test(normalized)) return Number.NaN;
@@ -131,18 +131,18 @@ export function validateTripForm(values: TripFormValues): TripFormErrors {
   return errors;
 }
 
-/** Nazwa domyślna, gdy użytkownik jej nie poda. */
+/** Default name when the user does not provide one. */
 export function defaultTripName(values: Pick<TripFormValues, 'origin' | 'destination'>): string {
   if (!values.origin || !values.destination) return '';
   return `${values.origin.stop_name} → ${values.destination.stop_name}`.slice(0, LIMITS.nameMax);
 }
 
-/** Wymaga wcześniejszej pomyślnej walidacji. */
+/** Requires a prior successful validation. */
 export function toTripPayload(values: TripFormValues): TripCreate {
   if (!values.origin || !values.destination) throw new Error('Brak przystanków');
   return {
     name: values.name.trim() || defaultTripName(values),
-    // Backend wymaga tekstowych nazw miejsc — przekazujemy nazwy przystanków GTFS.
+    // The backend requires text place names — the GTFS stop names are sent.
     origin: values.origin.stop_name,
     destination: values.destination.stop_name,
     origin_stop_id: values.origin.stop_id,

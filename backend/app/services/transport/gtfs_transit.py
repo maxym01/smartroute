@@ -1,10 +1,10 @@
-"""``TransitTimeProvider`` oparty o rozkład GTFS Static.
+"""``TransitTimeProvider`` based on the GTFS Static timetable.
 
-Zwraca czas z rozkładu (``DataSource.GTFS_SCHEDULE``), gdy podróż ma ``origin_stop_id``,
-``destination_stop_id`` i ``departure_at`` oraz istnieje bezpośrednie połączenie w oknie czasu.
-W każdym innym przypadku zwraca dotychczasowy szacunek parametryczny
-(``DataSource.PARAMETRIC_ESTIMATE``) z wyjaśnieniem w założeniach. Podróże bez żadnego
-z tych pól dostają szacunek bez zmian, dokładnie jak przed integracją GTFS.
+Returns the scheduled time (``DataSource.GTFS_SCHEDULE``) when the trip has ``origin_stop_id``,
+``destination_stop_id`` and ``departure_at`` and a direct connection exists within the window.
+In every other case it returns the parametric estimate (``DataSource.PARAMETRIC_ESTIMATE``)
+with the reason in the assumptions. Trips with none of these fields get the plain parametric
+estimate with no extra notes.
 """
 
 from sqlalchemy.exc import SQLAlchemyError

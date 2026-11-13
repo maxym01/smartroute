@@ -5,7 +5,7 @@ import { FIELD_LABELS, type TripFormErrors, type TripFormField } from './tripFor
 export interface UserFacingError {
   title: string;
   message: string;
-  /** Konkretne kroki naprawcze (heurystyka 9). */
+  /** Concrete recovery steps (heuristic 9). */
   hints: string[];
 }
 
@@ -39,7 +39,7 @@ function issueMessage(issue: ValidationIssue): string {
   return PYDANTIC_MESSAGES[issue.type] ?? issue.msg;
 }
 
-/** Zamienia błędy 422 z backendu na komunikaty przy konkretnych polach formularza. */
+/** Turns backend 422 errors into messages attached to specific form fields. */
 export function mapValidationIssues(issues: ValidationIssue[]): {
   fields: TripFormErrors;
   general: string[];

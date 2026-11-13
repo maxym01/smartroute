@@ -3,7 +3,7 @@ import { ApiError } from '../services/apiClient';
 import { describeError, mapValidationIssues } from './errors';
 import { formatCo2, formatCost, formatDuration, formatTime } from './format';
 
-// Intl używa twardej spacji (U+00A0) przed „zł” — normalizujemy ją w asercjach.
+// Intl uses a non-breaking space (U+00A0) before "zł" — normalize it in assertions.
 const plain = (text: string) => text.replace(/\u00a0/g, ' ');
 
 describe('formatowanie wartości', () => {

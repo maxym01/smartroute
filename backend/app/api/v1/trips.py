@@ -72,7 +72,7 @@ def update_trip(trip_id: TripId, payload: TripUpdate, repo: Repo) -> Trip:
     trip = _get_or_404(repo, trip_id)
     changes = payload.model_dump(exclude_unset=True)
 
-    # Reguły międzypolowe (np. origin != destination) sprawdzamy na stanie po scaleniu.
+    # Cross-field rules (e.g. origin != destination) are checked on the merged state.
     current = TripCreate.model_validate(trip, from_attributes=True).model_dump()
     try:
         merged = TripCreate.model_validate({**current, **changes})

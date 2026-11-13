@@ -1,4 +1,4 @@
-"""Kontrakt API przystanków i połączeń z rozkładu GTFS."""
+"""API contract for GTFS timetable stops and connections."""
 
 from datetime import UTC, date, datetime
 from typing import Literal

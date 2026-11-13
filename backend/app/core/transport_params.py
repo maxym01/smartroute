@@ -1,12 +1,12 @@
-"""Parametry modelu szacowania czasu, kosztu i emisji CO₂.
+"""Parameters of the time, cost and CO₂ emission estimation model.
 
-UWAGA: to są **przyjęte założenia modelowe** o charakterze poglądowym, dobrane jako rozsądne
-rzędy wielkości dla jazdy miejskiej w Polsce. Nie są to bieżące pomiary, aktualne ceny paliwa
-ani oficjalne taryfy żadnego przewoźnika. Każdą wartość można nadpisać zmienną środowiskową,
-np. ``TRANSPORT__CAR__FUEL_PRICE_PLN_PER_L=6.89``.
+NOTE: these are **assumed, illustrative model values**, chosen as reasonable orders of
+magnitude for urban travel in Poland. They are not live measurements, current fuel prices
+or official fares of any operator. Every value can be overridden with an environment
+variable, e.g. ``TRANSPORT__CAR__FUEL_PRICE_PLN_PER_L=6.89``.
 
-Wartości dodatnie w mianownikach (prędkości) są wymuszone walidacją ``gt=0``,
-więc obliczenia nie mogą dzielić przez zero.
+Denominators (speeds) are forced to be positive by ``gt=0`` validation,
+so the calculations can never divide by zero.
 """
 
 from pydantic import BaseModel, ConfigDict, Field

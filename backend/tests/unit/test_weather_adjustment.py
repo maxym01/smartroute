@@ -1,4 +1,4 @@
-"""WeatherAdjustmentService i reguła komfortu w rekomendacji."""
+"""WeatherAdjustmentService and the comfort rule in the recommendation."""
 
 from dataclasses import replace
 
@@ -84,7 +84,7 @@ def test_apply_changes_only_available_bike() -> None:
     assert adjuster.apply(unavailable, adj) is unavailable
 
 
-# --- reguła komfortu w RecommendationService ---------------------------------------------------
+# --- comfort rule in RecommendationService ---------------------------------------------------
 
 
 def estimates(bike_comfort: ComfortLevel | None):
@@ -106,7 +106,7 @@ def test_poor_bike_comfort_moves_bike_to_end_for_every_priority(priority: TripPr
     bike = rec.score_for(TransportMode.BIKE)
     assert bike is not None and bike.weather_demoted and bike.rank == 3
     assert rec.mode is not TransportMode.BIKE
-    # Wagi i normalizacja bez zmian — zmienia się wyłącznie pozycja roweru.
+    # Weights and normalization unchanged — only the bike's position changes.
     assert bike.balanced_score == baseline.score_for(TransportMode.BIKE).balanced_score
     others = [s for s in baseline.scores if s.mode is not TransportMode.BIKE]
     assert [s.mode for s in rec.scores[:2]] == [s.mode for s in others]
@@ -132,7 +132,7 @@ def test_no_demotion_when_bike_is_the_only_option() -> None:
     params = TransportSettings()
     trip = TripInput(distance_km=4, has_car=False)
     bike = replace(BikeCalculator(params.bike).estimate(trip), comfort_level=ComfortLevel.POOR)
-    car = CarCalculator(params.car).estimate(trip)  # niedostępny (has_car=False)
+    car = CarCalculator(params.car).estimate(trip)  # unavailable (has_car=False)
 
     rec = RecommendationService().recommend((car, bike), TripPriority.FASTEST)
     assert rec.mode is TransportMode.BIKE

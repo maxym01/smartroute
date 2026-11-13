@@ -10,7 +10,7 @@ export interface LocalDateTime {
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-/** Bieżąca data i godzina w strefie Europe/Warsaw — niezależnie od strefy przeglądarki. */
+/** Current date and time in Europe/Warsaw, regardless of the browser's time zone. */
 export function nowInGdansk(now: Date = new Date()): LocalDateTime {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: LOCAL_TIME_ZONE,
@@ -42,21 +42,21 @@ export function isValidTime(value: string): boolean {
 }
 
 /**
- * Format oczekiwany przez backend: ISO bez strefy, interpretowany jako Europe/Warsaw
+ * Format expected by the backend: ISO without a time zone, read as Europe/Warsaw
  * (app/core/timezone.py).
  */
 export function toBackendDateTime({ date, time }: LocalDateTime): string {
   return `${date}T${time}:00`;
 }
 
-/** Porównanie leksykograficzne działa dla stałego formatu YYYY-MM-DDTHH:MM. */
+/** Lexicographic comparison works for the fixed YYYY-MM-DDTHH:MM format. */
 export function compareLocal(a: LocalDateTime, b: LocalDateTime): number {
   const left = `${a.date}T${a.time}`;
   const right = `${b.date}T${b.time}`;
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-/** Różnica w minutach (a − b) dla dwóch momentów w tej samej strefie lokalnej. */
+/** Difference in minutes (a − b) between two moments in the same local time zone. */
 export function minutesBetween(a: LocalDateTime, b: LocalDateTime): number {
   const toMinutes = ({ date, time }: LocalDateTime) =>
     Date.UTC(

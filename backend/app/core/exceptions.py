@@ -1,4 +1,4 @@
-"""Wyjątki domenowe i handlery zapewniające spójny format błędów ``{detail, code}``."""
+"""Domain exceptions and handlers that ensure a consistent ``{detail, code}`` error format."""
 
 from typing import Any
 
@@ -27,7 +27,7 @@ class GtfsNotImportedError(Exception):
 
 
 def _serialize_validation_errors(errors: Any) -> list[dict[str, Any]]:
-    # Tylko pola serializowalne — ``ctx`` może zawierać obiekty wyjątków.
+    # Serializable fields only — ``ctx`` may contain exception objects.
     return [
         {
             "loc": list(error.get("loc", ())),

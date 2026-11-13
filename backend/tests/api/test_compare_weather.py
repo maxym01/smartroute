@@ -1,4 +1,4 @@
-"""Porównanie z bieżącą pogodą — Weatherbit zastąpiony mockiem (bez sieci)."""
+"""Comparison with current weather — Weatherbit replaced by a mock (no network)."""
 
 from datetime import datetime, timedelta
 from typing import Any
@@ -75,7 +75,7 @@ def test_good_weather(app: FastAPI, gtfs_client: TestClient) -> None:
     assert weather["adjustment"]["comfort_level"] == "good"
     assert body["recommendation"]["mode"] == "bike"
     assert bike(body)["comfort_level"] == "good"
-    assert bike(body)["estimated_duration_min"] == 16.0  # 4 km / 15 km/h, bez zmian
+    assert bike(body)["estimated_duration_min"] == 16.0  # 4 km / 15 km/h, unchanged
 
 
 def test_heavy_rain_demotes_bike_even_for_greenest(app: FastAPI, gtfs_client: TestClient) -> None:
@@ -87,7 +87,7 @@ def test_heavy_rain_demotes_bike_even_for_greenest(app: FastAPI, gtfs_client: Te
     assert bike(body)["score"]["weather_demoted"] is True
     assert bike(body)["score"]["rank"] == 3
     assert "przesunięto na koniec rankingu" in body["recommendation"]["explanation"]
-    assert bike(body)["estimated_co2_kg"] == 0.0  # metryki bez zmian
+    assert bike(body)["estimated_co2_kg"] == 0.0  # metrics unchanged
 
 
 def test_strong_wind_increases_bike_time(app: FastAPI, gtfs_client: TestClient) -> None:
@@ -95,7 +95,7 @@ def test_strong_wind_increases_bike_time(app: FastAPI, gtfs_client: TestClient) 
     body = compare(gtfs_client, "fastest")
 
     assert body["weather"]["adjustment"]["duration_factor"] == 1.2
-    assert bike(body)["estimated_duration_min"] == 19.2  # 16 min × 1,2
+    assert bike(body)["estimated_duration_min"] == 19.2  # 16 min × 1.2
     assert any("wiatru" in a for a in bike(body)["assumptions"])
 
 

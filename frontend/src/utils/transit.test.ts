@@ -48,7 +48,7 @@ describe('transitStatus', () => {
   });
 
   it('dopasowuje kurs po linii i godzinie odjazdu', () => {
-    const other = conn('8', '2026-11-12T18:57:00+01:00'); // ta sama godzina, inna linia
+    const other = conn('8', '2026-11-12T18:57:00+01:00'); // same time, different line
     const used = conn('2', '2026-11-12T18:57:00+01:00');
     expect(findUsedConnection(scheduled, [other, used])).toBe(used);
     expect(findUsedConnection(estimated, [used])).toBeNull();

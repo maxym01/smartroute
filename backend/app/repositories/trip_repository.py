@@ -57,6 +57,6 @@ class TripRepository:
         self.session.commit()
 
     def _commit_and_refresh(self, trip: Trip) -> None:
-        # refresh ładuje wartości wyliczone po stronie bazy (created_at/updated_at).
+        # refresh loads the values computed by the database (created_at/updated_at).
         self.session.commit()
         self.session.refresh(trip)

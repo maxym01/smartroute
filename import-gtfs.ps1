@@ -1,14 +1,14 @@
 ﻿<#
 .SYNOPSIS
-    Importuje rozkład GTFS Static (domyślnie oficjalny feed ZTM Gdańsk) do backend\gtfs.db.
+    Imports the GTFS Static timetable (by default the official ZTM Gdańsk feed) into backend\gtfs.db.
 
 .DESCRIPTION
-    Uruchamia "python -m app.cli.gtfs import" z interpretera .venv i z katalogu backend\
-    (tam leży .env i względna ścieżka bazy). Ponowne uruchomienie podmienia cały rozkład
-    w jednej transakcji; przy błędzie poprzedni rozkład zostaje bez zmian.
+    Runs "python -m app.cli.gtfs import" with the .venv interpreter from the backend\ directory
+    (where .env and the relative database path are resolved). Running it again replaces the
+    whole timetable in one transaction; on error the previous timetable stays unchanged.
 
 .PARAMETER Source
-    URL (http/https) albo ścieżka do lokalnego pliku ZIP. Domyślnie GTFS_FEED_URL z konfiguracji.
+    URL (http/https) or path to a local ZIP file. Defaults to GTFS_FEED_URL from the settings.
 
 .EXAMPLE
     .\import-gtfs.ps1
@@ -33,7 +33,7 @@ if (-not (Test-Path $VenvPython)) {
 
 $cliArgs = @('-m', 'app.cli.gtfs', 'import')
 if ($Source) {
-    # Ścieżkę względną liczymy od miejsca wywołania skryptu, a nie od backend\.
+    # A relative path is resolved from where the script was called, not from backend\.
     if (-not ($Source -match '^https?://') -and (Test-Path $Source)) {
         $Source = (Resolve-Path $Source).Path
     }

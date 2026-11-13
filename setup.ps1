@@ -1,18 +1,18 @@
 ﻿<#
 .SYNOPSIS
-    Przygotowuje lokalne środowisko backendu SmartRoute (Windows, Python 3.12).
+    Prepares the local SmartRoute backend environment (Windows, Python 3.12).
 
 .DESCRIPTION
-    1. Tworzy środowisko wirtualne .venv w katalogu głównym repozytorium (jeśli nie istnieje).
-    2. Instaluje backend w trybie edytowalnym wraz z narzędziami dev (pytest, ruff, httpx),
-       z wersjami przypiętymi w backend/requirements-lock.txt.
-    3. Tworzy backend/.env na podstawie backend/.env.example (jeśli .env jeszcze nie istnieje).
+    1. Creates the .venv virtual environment in the repository root (if it does not exist).
+    2. Installs the backend in editable mode with the dev tools (pytest, ruff, httpx),
+       using the versions pinned in backend/requirements-lock.txt.
+    3. Creates backend/.env from backend/.env.example (if .env does not exist yet).
 
-    Skrypt jest idempotentny: można go uruchamiać wielokrotnie. Nie usuwa istniejącego .venv,
-    pliku .env ani bazy SQLite.
+    The script is idempotent: it can be run repeatedly. It never deletes an existing
+    virtual environment (.venv), the .env file or the SQLite database.
 
 .PARAMETER NoDev
-    Instaluje tylko zależności uruchomieniowe (bez pytest/ruff/httpx).
+    Installs runtime dependencies only (no pytest/ruff/httpx).
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\setup.ps1
@@ -44,9 +44,9 @@ function Stop-WithError([string]$Message) {
 }
 
 function Get-PythonVersion([string]$Exe, [string[]]$PrefixArgs = @()) {
-    # Zwraca np. "3.12" albo $null, jeśli interpreter nie działa.
+    # Returns e.g. "3.12", or $null if the interpreter does not work.
     try {
-        # Bez cudzysłowów podwójnych: Windows PowerShell 5.1 gubi je przy wywołaniu natywnego exe.
+        # No double quotes: Windows PowerShell 5.1 drops them when calling a native exe.
         $out = & $Exe @PrefixArgs -c 'import sys; print(*sys.version_info[:2], sep=chr(46))' 2>$null
         if ($LASTEXITCODE -eq 0 -and $out) { return ($out | Select-Object -First 1).Trim() }
     } catch { }
@@ -54,7 +54,7 @@ function Get-PythonVersion([string]$Exe, [string[]]$PrefixArgs = @()) {
 }
 
 function Find-BasePython {
-    # Kolejność: launcher "py -3.12", potem "python" z PATH (pomijając alias ze Sklepu Microsoft).
+    # Order: the "py -3.12" launcher, then "python" from PATH (skipping the Microsoft Store alias).
     if (Get-Command py -ErrorAction SilentlyContinue) {
         if ((Get-PythonVersion 'py' @("-$RequiredPython")) -eq $RequiredPython) {
             return @{ Exe = 'py'; Args = @("-$RequiredPython") }
@@ -73,7 +73,7 @@ if (-not (Test-Path (Join-Path $BackendDir 'pyproject.toml'))) {
     Stop-WithError "Nie znaleziono backend\pyproject.toml. Uruchom skrypt z katalogu głównego repozytorium."
 }
 
-# --- 1. Środowisko wirtualne ---------------------------------------------------------------
+# --- 1. Virtual environment ----------------------------------------------------------------
 Write-Step "Środowisko wirtualne (.venv, Python $RequiredPython)"
 if (Test-Path $VenvPython) {
     $venvVersion = Get-PythonVersion $VenvPython
@@ -95,7 +95,7 @@ if (Test-Path $VenvPython) {
     Write-Ok "Utworzono .venv."
 }
 
-# --- 2. Zależności -------------------------------------------------------------------------
+# --- 2. Dependencies -----------------------------------------------------------------------
 $target = if ($NoDev) { $BackendDir } else { "$BackendDir[dev]" }
 Write-Step "Instalacja zależności ($(if ($NoDev) { 'runtime' } else { 'runtime + dev' }))"
 $pipArgs = @('-m', 'pip', 'install', '--disable-pip-version-check', '-e', $target)
@@ -114,7 +114,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Zależności zainstalowane."
 
-# --- 3. Konfiguracja lokalna ---------------------------------------------------------------
+# --- 3. Local configuration ----------------------------------------------------------------
 Write-Step "Konfiguracja lokalna (backend\.env)"
 if (Test-Path $EnvFile) {
     Write-Ok "backend\.env już istnieje - pozostawiam bez zmian."

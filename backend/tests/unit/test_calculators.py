@@ -22,7 +22,7 @@ PT = PublicTransportParams()
 BIKE = BikeParams()
 
 
-# --- TripInput i funkcje pomocnicze ---------------------------------------------------------
+# --- TripInput and helper functions --------------------------------------------------------
 
 
 @pytest.mark.parametrize("distance", [0, -1])
@@ -83,7 +83,7 @@ def test_transport_settings_defaults() -> None:
     assert settings.car == CAR and settings.public_transport == PT and settings.bike == BIKE
 
 
-# --- samochód -------------------------------------------------------------------------------
+# --- car ------------------------------------------------------------------------------------
 
 
 def test_car_estimate_for_single_passenger() -> None:
@@ -92,7 +92,7 @@ def test_car_estimate_for_single_passenger() -> None:
     assert e.mode is TransportMode.CAR
     assert e.available is True and e.unavailable_reason is None
     assert e.duration_min == pytest.approx(20 / 40 * 60 + 5)  # 35 min
-    assert e.cost_pln == pytest.approx(9.10)  # 20 km · 7 l/100 km · 6,50 zł/l
+    assert e.cost_pln == pytest.approx(9.10)  # 20 km · 7 l/100 km · 6.50 PLN/l
     assert e.co2_kg == pytest.approx(3.4)  # 20 km · 0,17 kg/km
     assert e.cost_per_passenger_pln == e.cost_pln
     assert e.data_source is DataSource.PARAMETRIC_ESTIMATE
@@ -125,7 +125,7 @@ def test_car_uses_custom_params() -> None:
     assert e.cost_pln == pytest.approx(30 * 7 / 100 * 10)
 
 
-# --- komunikacja miejska --------------------------------------------------------------------
+# --- public transport -----------------------------------------------------------------------
 
 
 def test_public_transport_within_base_ticket() -> None:
@@ -163,7 +163,7 @@ def test_public_transport_is_available_regardless_of_preferences() -> None:
 
 
 class FakeScheduleProvider:
-    """Atrapa przyszłego dostawcy GTFS — bez dostępu do sieci."""
+    """Fake GTFS schedule provider — no network access."""
 
     def __init__(self, result: TransitTimeEstimate | None) -> None:
         self.result = result
@@ -186,7 +186,7 @@ def test_public_transport_uses_injected_time_provider() -> None:
     assert e.duration_min == 42.0
     assert e.data_source is DataSource.GTFS_SCHEDULE
     assert "Połączenie z rozkładu." in e.assumptions
-    assert e.cost_pln == pytest.approx(4.40)  # koszt nadal z parametrów
+    assert e.cost_pln == pytest.approx(4.40)  # cost still comes from the parameters
 
 
 def test_public_transport_falls_back_when_provider_has_no_data() -> None:
@@ -199,7 +199,7 @@ def test_public_transport_falls_back_when_provider_has_no_data() -> None:
     assert "Brak danych z rozkładu" in e.assumptions[0]
 
 
-# --- rower ----------------------------------------------------------------------------------
+# --- bike -----------------------------------------------------------------------------------
 
 
 def test_bike_estimate() -> None:

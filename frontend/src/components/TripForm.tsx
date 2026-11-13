@@ -39,11 +39,11 @@ interface TripFormProps {
   onChange: (patch: Partial<TripFormValues>) => void;
   onSubmit: () => void;
   isSubmitting: boolean;
-  /** Błędy pól zwrócone przez backend (422). */
+  /** Field errors returned by the backend (422). */
   serverErrors?: TripFormErrors;
-  /** Opis bieżącego etapu przetwarzania, np. „Zapisywanie podróży…”. */
+  /** Description of the current processing step, e.g. "Zapisywanie podróży…". */
   progressLabel?: string;
-  /** Po pierwszym porównaniu przycisk mówi „Porównaj ponownie”. */
+  /** After the first comparison the button reads "Porównaj ponownie" (compare again). */
   hasResults?: boolean;
 }
 
@@ -59,7 +59,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-/** Przełącznik w formie kompaktowego „chipa” — natywny checkbox z role="switch". */
+/** Toggle styled as a compact "chip" — a native checkbox with role="switch". */
 function ToggleChip({
   id,
   checked,
@@ -119,10 +119,10 @@ export function TripForm({
   const summaryRef = useRef<HTMLDivElement>(null);
 
   const clientErrors = validateTripForm(values);
-  // Błędy pokazujemy po pierwszej próbie wysłania, potem aktualizujemy je na bieżąco.
+  // Errors are shown after the first submit attempt, then updated live.
   const errors: TripFormErrors = attempted ? { ...serverErrors, ...clientErrors } : serverErrors;
   const errorFields = FIELD_ORDER.filter((field) => errors[field]);
-  // Pole z błędem nie może pozostać ukryte w zwiniętej sekcji.
+  // A field with an error must not stay hidden in a collapsed section.
   const showAdvanced = advancedOpen || Boolean(errors.name);
 
   const errorId = (field: TripFormField) => `${FIELD_IDS[field]}-error`;
@@ -132,7 +132,7 @@ export function TripForm({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSubmitting) return; // blokada wielokrotnego wysłania (heurystyka 1)
+    if (isSubmitting) return; // prevent repeated submission (heuristic 1)
     setAttempted(true);
     if (Object.keys(clientErrors).length > 0) {
       requestAnimationFrame(() => summaryRef.current?.focus());
@@ -206,7 +206,7 @@ export function TripForm({
       )}
 
       <div className="grid grid-cols-1 gap-x-5 gap-y-4 lg:grid-cols-12">
-        {/* Trasa */}
+        {/* Route */}
         <fieldset className="lg:col-span-7">
           <legend className="sr-only">Trasa</legend>
           <div className="grid grid-cols-1 items-start gap-x-2 gap-y-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
@@ -245,7 +245,7 @@ export function TripForm({
           </div>
         </fieldset>
 
-        {/* Termin */}
+        {/* Date and time */}
         <fieldset className="lg:col-span-5">
           <legend className="sr-only">Termin wyjazdu</legend>
           <div className="grid grid-cols-2 gap-2 [&>*]:min-w-0">
@@ -306,7 +306,7 @@ export function TripForm({
           </div>
         </fieldset>
 
-        {/* Dystans */}
+        {/* Distance */}
         <div className="lg:col-span-4">
           <div className="mb-1.5 flex items-center gap-1">
             <label htmlFor={FIELD_IDS.distanceKm} className="text-sm font-medium text-slate-200">
@@ -357,7 +357,7 @@ export function TripForm({
           </p>
         </div>
 
-        {/* Priorytet */}
+        {/* Priority */}
         <div className="lg:col-span-8">
           <p id="priority-label" className="field-label">
             Priorytet
@@ -371,7 +371,7 @@ export function TripForm({
         </div>
       </div>
 
-      {/* Pasek opcji i akcja główna */}
+      {/* Options bar and the primary action */}
       <div className="mt-5 flex flex-col gap-4 border-t border-navy-700 pt-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1 rounded-xl border border-navy-600 bg-navy-900 p-0.5">

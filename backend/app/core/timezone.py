@@ -1,7 +1,7 @@
-"""Strefa czasowa aplikacji.
+"""Application time zone.
 
-Daty bez strefy (np. ``2026-11-12T08:00``) podane przez klienta interpretujemy jako czas lokalny
-Gdańska. Wymaga pakietu ``tzdata`` na Windows (brak systemowej bazy stref).
+Naive datetimes sent by the client (e.g. ``2026-11-12T08:00``) are read as Gdańsk local
+time. Requires the ``tzdata`` package on Windows (no system time zone database).
 """
 
 from datetime import datetime
@@ -12,5 +12,5 @@ LOCAL_TIMEZONE = ZoneInfo(LOCAL_TIMEZONE_NAME)
 
 
 def as_local_aware(value: datetime) -> datetime:
-    """Dodaje strefę Europe/Warsaw do daty naiwnej. Datę ze strefą zwraca bez zmian."""
+    """Attach Europe/Warsaw to a naive datetime. An aware datetime is returned unchanged."""
     return value.replace(tzinfo=LOCAL_TIMEZONE) if value.tzinfo is None else value

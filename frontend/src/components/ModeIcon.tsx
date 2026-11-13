@@ -3,7 +3,7 @@ import type { TransportMode } from '../types/api';
 
 const ICONS = { car: Car, public_transport: Bus, bike: Bike } as const;
 
-/** Kolor tła ikony jest stały dla danego środka transportu w całej aplikacji. */
+/** The icon background colour is fixed per transport mode across the whole app. */
 const MODE_ACCENTS: Record<TransportMode, string> = {
   car: 'bg-sky-400/15 text-sky-300 ring-sky-400/30',
   public_transport: 'bg-violet-400/15 text-violet-300 ring-violet-400/30',

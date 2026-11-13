@@ -2,10 +2,10 @@ import { Info } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 
 interface InfoTipProps {
-  /** Dostępna nazwa przycisku, np. „Więcej o dystansie”. */
+  /** Accessible name of the button, e.g. "Więcej o dystansie". */
   label: string;
   children: ReactNode;
-  /** Wyrównanie dymka względem ikony — chroni przed wyjściem poza ekran na wąskich telefonach. */
+  /** Tooltip alignment relative to the icon — keeps it on screen on narrow phones. */
   align?: 'start' | 'center' | 'end';
 }
 
@@ -16,9 +16,9 @@ const ALIGN = {
 } as const;
 
 /**
- * Dymek z dodatkowym wyjaśnieniem: otwiera się po najechaniu, focusie klawiatury lub kliknięciu
- * (dotyk), zamyka klawiszem Escape. Treść jest zawsze podpięta przez aria-describedby,
- * więc czytnik ekranu odczyta ją także bez otwierania.
+ * Tooltip with an extra explanation: opens on hover, keyboard focus or click (touch) and
+ * closes with Escape. The content is always linked via aria-describedby, so a screen reader
+ * reads it even when the tooltip is closed.
  */
 export function InfoTip({ label, children, align = 'center' }: InfoTipProps) {
   const [open, setOpen] = useState(false);

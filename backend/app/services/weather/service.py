@@ -1,13 +1,13 @@
-"""Ustala, czy i jaką bieżącą pogodę można użyć dla podróży. Nigdy nie zgłasza wyjątku.
+"""Decide whether, and which, current weather can be used for a trip. Never raises.
 
-Kolejność warunków (pierwszy niespełniony kończy ocenę z wyjaśnieniem):
+Order of conditions (the first unmet one ends the assessment with an explanation):
 
-1. integracja włączona (jest ``WEATHERBIT_API_KEY``),
-2. podróż odbywa się teraz lub wkrótce: ``departure_at`` w przedziale
-   [teraz − 60 min, teraz + ``weather_max_lead_min``] — pogoda bieżąca nie jest prognozą,
-3. wiarygodna lokalizacja: współrzędne przystanku startowego GTFS (``origin_stop_id``);
-   tekstowych nazw miejsc (``origin``) nie zamieniamy na współrzędne,
-4. odpowiedź Weatherbit (z cache lub z API).
+1. the integration is enabled (``WEATHERBIT_API_KEY`` is set),
+2. the trip happens now or soon: ``departure_at`` within
+   [now − 60 min, now + ``weather_max_lead_min``] — current weather is not a forecast,
+3. a reliable location: the coordinates of the GTFS origin stop (``origin_stop_id``);
+   text place names (``origin``) are never converted into coordinates,
+4. a Weatherbit response (from the cache or the API).
 """
 
 import logging
@@ -80,7 +80,7 @@ class WeatherService:
     def assess(self, trip: TripInput) -> WeatherContext:
         try:
             return self._assess(trip)
-        except Exception:  # noqa: BLE001 — pogoda nigdy nie może zepsuć porównania
+        except Exception:  # noqa: BLE001 — weather must never break the comparison
             logger.exception("Nieoczekiwany błąd oceny pogody")
             return WeatherContext(
                 WeatherStatus.UNAVAILABLE, "Nieoczekiwany błąd pobierania pogody."
@@ -145,7 +145,7 @@ class WeatherService:
             return None
         try:
             stop = self.locator.get_stop(trip.origin_stop_id)
-        except SQLAlchemyError:  # np. baza rozkładu bez tabel
+        except SQLAlchemyError:  # e.g. a timetable database without tables
             return None
         if stop is None or stop.stop_lat is None or stop.stop_lon is None:
             return None

@@ -1,10 +1,10 @@
-"""Komunikacja miejska.
+"""Public transport.
 
-Czas przejazdu pochodzi z wymiennego ``TransitTimeProvider``. Dziś domyślnym dostawcą jest
-``ParametricTransitTimeProvider`` (dystans / średnia prędkość + dojście i oczekiwanie).
-W kolejnym etapie można wstrzyknąć dostawcę opartego o rozkład GTFS — jeśli nie znajdzie
-połączenia (zwróci ``None``), kalkulator automatycznie wraca do szacunku parametrycznego.
-Koszt biletów i emisja zawsze pochodzą z parametrów konfiguracji.
+The travel time comes from a pluggable ``TransitTimeProvider``. The fallback provider is
+``ParametricTransitTimeProvider`` (distance / average speed + access and waiting time).
+The API injects the GTFS timetable provider (``gtfs_transit``); when it finds no connection
+(returns ``None``), the calculator falls back to the parametric estimate.
+Ticket cost and emissions always come from the configured parameters.
 """
 
 from dataclasses import dataclass, field
@@ -32,7 +32,7 @@ class TransitTimeEstimate:
 
 class TransitTimeProvider(Protocol):
     def estimate(self, trip: TripInput) -> TransitTimeEstimate | None:
-        """Zwraca czas przejazdu „od drzwi do drzwi” albo ``None``, gdy brak danych."""
+        """Return the "door to door" travel time, or ``None`` when there is no data."""
         ...
 
 

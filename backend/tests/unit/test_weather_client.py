@@ -1,4 +1,4 @@
-"""WeatherbitClient: normalizacja jednostek, cache TTL, błędy i ochrona klucza (offline)."""
+"""WeatherbitClient: unit normalization, TTL cache, errors and key protection (offline)."""
 
 import logging
 import urllib.error
@@ -40,7 +40,7 @@ def test_request_uses_metric_units_coordinates_and_timeout() -> None:
     query = urllib.parse.parse_qs(parsed.query)
     assert parsed.path.endswith("/v2.0/current")
     assert query["units"] == ["M"]
-    assert query["lat"] == ["54.4"] and query["lon"] == ["18.6"]  # komórka siatki 0,1°
+    assert query["lat"] == ["54.4"] and query["lon"] == ["18.6"]  # 0.1° grid cell
     assert query["key"] == [TEST_KEY]
     assert fetch.timeouts == [2.5]
 
@@ -71,7 +71,7 @@ def test_cache_serves_same_cell_within_ttl_and_refreshes_after() -> None:
 
     first = client.current(54.351, 18.641)
     clock.advance(1799)
-    second = client.current(54.369, 18.609)  # inna współrzędna, ta sama komórka 54.4/18.6
+    second = client.current(54.369, 18.609)  # different coordinate, same cell 54.4/18.6
     assert second is first
     assert client.requests_sent == 1
 
@@ -121,7 +121,7 @@ def test_rate_limit_429_triggers_cooldown_then_retries() -> None:
 
     with pytest.raises(WeatherUnavailableError, match="429"):
         client.current(54.35, 18.64)
-    # W trakcie cooldownu — także dla innej lokalizacji — nie odpytujemy API.
+    # During the cooldown — even for another location — the API is not queried.
     with pytest.raises(WeatherUnavailableError, match="429"):
         client.current(54.52, 18.53)
     assert client.requests_sent == 1

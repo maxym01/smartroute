@@ -10,7 +10,7 @@ const ICONS: Record<TripPriority, typeof Zap> = {
   greenest: Leaf,
 };
 
-/** Krótkie etykiety dla segmentów — pełne nazwy są w opisie i w dostępnej nazwie. */
+/** Short segment labels — the full names are in the description and the accessible name. */
 const SHORT_LABELS: Record<TripPriority, string> = {
   balanced: 'Zrównoważony',
   fastest: 'Najszybszy',
@@ -22,16 +22,16 @@ interface PrioritySelectorProps {
   value: TripPriority;
   onChange: (priority: TripPriority) => void;
   disabled?: boolean;
-  /** `full` — w formularzu, z opisem wybranej opcji; `compact` — szybka zmiana nad wynikami. */
+  /** `full` — in the form, with the option description; `compact` — quick switch above results. */
   variant?: 'full' | 'compact';
   name?: string;
-  /** Id elementu z etykietą grupy. */
+  /** Id of the element holding the group label. */
   labelledBy?: string;
 }
 
 /**
- * Segmenty oparte na natywnych radio: strzałki zmieniają wybór, Tab przechodzi dalej.
- * Opis wybranego priorytetu jest stale widoczny pod segmentami (heurystyka 6).
+ * Segments built on native radio inputs: arrow keys change the selection, Tab moves on.
+ * The description of the selected priority is always visible below the segments (heuristic 6).
  */
 export function PrioritySelector({
   value,

@@ -25,10 +25,10 @@ def connections(client: TestClient, origin: str, destination: str, departure_at:
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
-        ("glowny", ["A1"]),  # bez polskich znaków
-        ("ŁĄKOWA", ["C1"]),  # wielkie litery z diakrytykami
-        ("01", ["B1", "A1", "C1", "D1"]),  # alfabetycznie po nazwie
-        ("D1", ["D1"]),  # dokładny stop_id
+        ("glowny", ["A1"]),  # without Polish diacritics
+        ("ŁĄKOWA", ["C1"]),  # upper case with diacritics
+        ("01", ["B1", "A1", "C1", "D1"]),  # alphabetical by name
+        ("D1", ["D1"]),  # exact stop_id
     ],
 )
 def test_search_stops(gtfs_client: TestClient, query: str, expected: list[str]) -> None:
@@ -104,7 +104,7 @@ def test_opposite_direction_uses_stop_sequence(gtfs_client: TestClient) -> None:
 
 
 def test_departure_with_explicit_offset_is_respected(gtfs_client: TestClient) -> None:
-    # 06:58 UTC = 07:58 w Gdańsku
+    # 06:58 UTC = 07:58 in Gdańsk
     body = connections(gtfs_client, "A1", "C1", "2026-11-12T06:58:00Z", window_min=5).json()
 
     assert [c["trip_id"] for c in body["connections"]] == ["T1"]
@@ -123,7 +123,7 @@ def test_connection_after_midnight(gtfs_client: TestClient) -> None:
 
 
 def test_after_midnight_departure_finds_previous_service_day(gtfs_client: TestClient) -> None:
-    # 13.11 00:00 — kurs T3 jedzie według kalendarza z 12.11 (czasy 24:05 / 24:20).
+    # 13.11 00:00 — trip T3 runs on the 12.11 calendar (times 24:05 / 24:20).
     body = connections(gtfs_client, "B1", "C1", "2026-11-13T00:00:00").json()
 
     assert [c["trip_id"] for c in body["connections"]] == ["T3"]
@@ -131,7 +131,7 @@ def test_after_midnight_departure_finds_previous_service_day(gtfs_client: TestCl
 
 
 def test_calendar_dates_decide_service(gtfs_client: TestClient) -> None:
-    # 13.11 jeździ tylko WD (T1), a nocny NIGHT nie.
+    # On 13.11 only WD (T1) runs; the NIGHT service does not.
     body = connections(gtfs_client, "A1", "C1", "2026-11-13T07:00:00", window_min=1440).json()
 
     assert [(c["trip_id"], c["service_date"]) for c in body["connections"]] == [
@@ -147,7 +147,7 @@ def test_no_connection_returns_empty_list_with_note(gtfs_client: TestClient) -> 
 
 
 def test_drop_off_not_allowed_at_destination_is_excluded(gtfs_client: TestClient) -> None:
-    # A1 to pierwszy przystanek T1 z drop_off_type=1 — nie da się tam dojechać T1.
+    # A1 is the first stop of T1 with drop_off_type=1 — T1 cannot be used to get there.
     body = connections(gtfs_client, "B1", "A1", "2026-11-12T08:05:00", window_min=30).json()
 
     assert body["connections"] == []

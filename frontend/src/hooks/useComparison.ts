@@ -18,15 +18,15 @@ export type ComparisonPhase = 'idle' | 'saving' | 'comparing' | 'success' | 'err
 
 export type RunOutcome = { ok: true } | { ok: false; error: unknown } | { ok: false; stale: true };
 
-/** Klucz podróży bez priorytetu: zmiana samego priorytetu nie tworzy nowej podróży. */
+/** Trip key without the priority: changing only the priority does not create a new trip. */
 function tripKey(payload: TripCreate): string {
   const { priority: _priority, ...rest } = payload;
   return JSON.stringify(rest);
 }
 
 /**
- * Przepływ: POST /trips → GET /trips/{id}/compare, równolegle GET /connections
- * (lista kursów do panelu rozkładu — /compare zwraca tylko najlepszy kurs w założeniach).
+ * Flow: POST /trips → GET /trips/{id}/compare, with GET /connections in parallel
+ * (trip list for the timetable panel — /compare returns only the best trip in its assumptions).
  */
 export function useComparison() {
   const [phase, setPhase] = useState<ComparisonPhase>('idle');
@@ -63,7 +63,7 @@ export function useComparison() {
             )
           : Promise.resolve({ status: 'error', error: null });
 
-      // Zapisana podróż ma zapisany priorytet; przy ponownym użyciu nadpisujemy go parametrem.
+      // A saved trip has a saved priority; when it is reused, the query parameter overrides it.
       const comparison = await compareTrip(trip.id, payload.priority);
       const schedule = await schedulePromise;
       if (!isCurrent()) return { ok: false, stale: true };

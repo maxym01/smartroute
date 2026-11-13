@@ -1,6 +1,6 @@
-"""Punkt wejścia aplikacji FastAPI.
+"""FastAPI application entry point.
 
-Uruchomienie (z katalogu ``backend``): ``uvicorn app.main:app --reload``
+Run (from the ``backend`` directory): ``uvicorn app.main:app --reload``
 """
 
 from collections.abc import AsyncIterator
@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Engine
 
-import app.models  # noqa: F401  — rejestruje modele w Base.metadata przed create_all
+import app.models  # noqa: F401  — registers the models in Base.metadata before create_all
 from app.api.v1.router import api_router
 from app.core.config import API_V1_PREFIX, Settings, get_settings
 from app.core.exceptions import register_exception_handlers
@@ -24,8 +24,8 @@ CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Alembic poza zakresem MVP — tabele tworzymy przy starcie, a nowe kolumny nullable
-    # dodaje idempotentna migracja (bez utraty danych).
+    # Alembic is out of the MVP scope: tables are created at startup, and new nullable
+    # columns are added by an idempotent migration (no data loss).
     Base.metadata.create_all(bind=app.state.engine)
     upgrade_schema(app.state.engine)
     yield
@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     )
     app.state.settings = settings
     app.state.engine = engine or db_session.engine
-    # Jeden klient na aplikację: wspólny cache TTL i cooldown po błędach dla wszystkich żądań.
+    # One client per application: a shared TTL cache and error cooldown for all requests.
     app.state.weather_client = build_weather_client(settings)
 
     app.add_middleware(

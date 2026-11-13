@@ -18,9 +18,9 @@ function benefitLabel({ metric, sharedWith }: BestMetric): string {
 }
 
 /**
- * Ostrzeżenie, gdy rekomendowana komunikacja opiera się na szacunku, a nie na potwierdzonym kursie.
- * Brak kursu bezpośredniego nie oznacza, że komunikacja jest niedostępna — stąd ostrzeżenie,
- * a nie zmiana rekomendacji (tę wybiera wyłącznie backend).
+ * Warning shown when recommended public transport relies on an estimate, not a confirmed trip.
+ * A missing direct trip does not mean public transport is unavailable, hence a warning
+ * rather than a different recommendation (only the backend chooses that).
  */
 function transitWarning(status: TransitStatus | undefined): string | null {
   if (!status || status.kind === 'confirmed') return null;
@@ -35,13 +35,13 @@ function transitWarning(status: TransitStatus | undefined): string | null {
 
 interface RecommendationPanelProps {
   comparison: ComparisonResponse;
-  /** Status czasu komunikacji (ten sam co w karcie i panelu odjazdów). */
+  /** Public transport time status (the same as in the card and the departures panel). */
   transit?: TransitStatus;
 }
 
 /**
- * Rekomendacja pochodzi wyłącznie z backendu. Frontend dodaje jedynie opis danych:
- * w których metrykach rekomendowany wariant jest najlepszy oraz jawne ostrzeżenia.
+ * The recommendation comes only from the backend. The frontend merely describes the data:
+ * which metrics the recommended option is best at, plus explicit warnings.
  */
 export function RecommendationPanel({ comparison, transit }: RecommendationPanelProps) {
   const { recommendation, scoring, variants } = comparison;

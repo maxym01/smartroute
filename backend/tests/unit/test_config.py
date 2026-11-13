@@ -62,7 +62,7 @@ def test_transport_params_overridable_with_nested_env(monkeypatch: pytest.Monkey
 
     assert settings.transport.car.fuel_price_pln_per_l == 7.25
     assert settings.transport.bike.max_distance_km == 25
-    assert settings.transport.car.avg_speed_kmh == 40  # pozostałe bez zmian
+    assert settings.transport.car.avg_speed_kmh == 40  # the rest unchanged
 
 
 def test_transport_params_from_env_are_validated(monkeypatch: pytest.MonkeyPatch) -> None:

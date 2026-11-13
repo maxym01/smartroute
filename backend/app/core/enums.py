@@ -1,4 +1,4 @@
-"""Enumy domenowe współdzielone przez modele, schematy i serwisy (bez zależności od ORM/API)."""
+"""Domain enums shared by models, schemas and services (no ORM/API dependencies)."""
 
 from enum import StrEnum
 
@@ -19,9 +19,9 @@ class TransportMode(StrEnum):
 class DataSource(StrEnum):
     """Skąd pochodzi szacunek czasu przejazdu danego wariantu."""
 
-    # Prosty model parametryczny: dystans / średnia prędkość + stałe narzuty z konfiguracji.
+    # Simple parametric model: distance / average speed + fixed overheads from the settings.
     PARAMETRIC_ESTIMATE = "parametric_estimate"
-    # Zarezerwowane dla kolejnego etapu: czas wyznaczony z rozkładu GTFS.
+    # Scheduled time from the GTFS timetable.
     GTFS_SCHEDULE = "gtfs_schedule"
 
 
@@ -36,9 +36,9 @@ class ComfortLevel(StrEnum):
 class WeatherStatus(StrEnum):
     """Wynik próby użycia bieżącej pogody w porównaniu."""
 
-    APPLIED = "applied"  # pobrano pogodę i oceniono rower
-    DISABLED = "disabled"  # brak WEATHERBIT_API_KEY — integracja wyłączona
-    NO_LOCATION = "no_location"  # brak wiarygodnych współrzędnych (przystanku GTFS)
-    OUT_OF_TIME_WINDOW = "out_of_time_window"  # podróż nie odbywa się teraz / wkrótce
-    UNAVAILABLE = "unavailable"  # błąd API, limit, timeout, brak internetu
-    NOT_APPLICABLE = "not_applicable"  # rower niedostępny — korekta nie miałaby czego dotyczyć
+    APPLIED = "applied"  # weather fetched and the bike assessed
+    DISABLED = "disabled"  # no WEATHERBIT_API_KEY — integration disabled
+    NO_LOCATION = "no_location"  # no reliable coordinates (GTFS stop)
+    OUT_OF_TIME_WINDOW = "out_of_time_window"  # the trip is not happening now / soon
+    UNAVAILABLE = "unavailable"  # API error, rate limit, timeout, no internet
+    NOT_APPLICABLE = "not_applicable"  # bike unavailable — there is nothing to adjust

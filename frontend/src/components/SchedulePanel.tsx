@@ -14,7 +14,7 @@ const ROUTE_ICONS: Record<RouteKind, typeof Bus> = {
   Linia: Bus,
 };
 
-/** Notatki backendu, które panel już przedstawia własnymi słowami. */
+/** Backend notes that the panel already presents in its own words. */
 const STANDARD_NOTES = [
   'Rozkład planowy GTFS Static',
   'Tylko połączenia bezpośrednie',
@@ -27,15 +27,15 @@ function waitMinutes(requestedAt: string, connection: Connection): number {
 
 interface SchedulePanelProps {
   schedule: ScheduleState;
-  /** Kurs, którego backend użył do czasu komunikacji (null = żaden / nie dopasowano). */
+  /** The trip the backend used for the public transport time (null = none / not matched). */
   usedConnection: Connection | null;
-  /** Przenosi użytkownika do formularza, by zmienił przystanki lub godzinę. */
+  /** Takes the user to the form to change the stops or the time. */
   onEditTrip: () => void;
 }
 
 /**
- * Odjazdy z planowego rozkładu GTFS Static (GET /connections) — osobno od szacowanego czasu
- * podróży. Bez opóźnień i danych w czasie rzeczywistym.
+ * Departures from the GTFS Static timetable (GET /connections), separate from the estimated
+ * travel time. No delays and no real-time data.
  */
 export function SchedulePanel({ schedule, usedConnection, onEditTrip }: SchedulePanelProps) {
   const extraNotes =

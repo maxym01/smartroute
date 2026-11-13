@@ -1,4 +1,4 @@
-"""Rejestr modeli ORM — import gwarantuje, że tabele trafią do ``Base.metadata``."""
+"""ORM model registry: importing it guarantees the tables are registered in ``Base.metadata``."""
 
 from app.models.trip import Trip, TripPriority
 

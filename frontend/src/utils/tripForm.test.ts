@@ -88,7 +88,7 @@ describe('toTripPayload', () => {
 
 describe('nowInGdansk', () => {
   it('zwraca czas w strefie Europe/Warsaw niezależnie od strefy przeglądarki', () => {
-    // 17:30 UTC w listopadzie = 18:30 w Gdańsku (CET, UTC+1).
+    // 17:30 UTC in November = 18:30 in Gdańsk (CET, UTC+1).
     expect(nowInGdansk(new Date('2026-11-12T17:30:00Z'))).toEqual({ date: '2026-11-12', time: '18:30' });
   });
 });

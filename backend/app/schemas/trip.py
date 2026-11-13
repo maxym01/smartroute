@@ -1,4 +1,4 @@
-"""Schematy Pydantic podróży: TripCreate (POST/PUT), TripUpdate (PATCH), TripRead, TripList."""
+"""Pydantic trip schemas: TripCreate (POST/PUT), TripUpdate (PATCH), TripRead, TripList."""
 
 from datetime import UTC, datetime
 from typing import Annotated, Self
@@ -114,7 +114,7 @@ class TripUpdate(BaseModel):
     has_car: bool | None = None
     allow_bike: bool | None = None
     notes: Notes = None
-    # Pola GTFS można wyczyścić wartością null.
+    # GTFS fields can be cleared with null.
     origin_stop_id: StopId = None
     destination_stop_id: StopId = None
     departure_at: DepartureAt = None
@@ -164,7 +164,7 @@ class TripRead(BaseModel):
     @field_validator("departure_at")
     @classmethod
     def _as_local_time(cls, value: datetime | None) -> datetime | None:
-        # Zwracamy w czasie lokalnym (np. +01:00) — to ta sama chwila co zapisane UTC.
+        # Returned in local time (e.g. +01:00) — the same instant as the stored UTC value.
         if value is None:
             return None
         return (value if value.tzinfo else value.replace(tzinfo=UTC)).astimezone(LOCAL_TIMEZONE)

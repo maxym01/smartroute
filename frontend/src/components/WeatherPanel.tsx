@@ -5,7 +5,7 @@ import { formatNumber, formatTemperature, formatTime } from '../utils/format';
 import { COMFORT_LABELS } from '../utils/labels';
 import { InfoTip } from './ui/InfoTip';
 
-/** Neutralne tytuły dla sytuacji, w których pogody nie uwzględniono. */
+/** Neutral titles for cases where the weather was not applied. */
 const STATUS_TITLES: Record<Exclude<WeatherStatus, 'applied'>, string> = {
   disabled: 'Integracja pogodowa wyłączona',
   no_location: 'Brak lokalizacji do sprawdzenia pogody',

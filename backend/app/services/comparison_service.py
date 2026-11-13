@@ -23,7 +23,7 @@ from app.services.weather import (
 
 @dataclass(frozen=True, slots=True)
 class WeatherOutcome:
-    """Co porównanie zrobiło z pogodą: kontekst (skąd, kiedy, dlaczego) i ewentualna korekta."""
+    """What the comparison did with the weather: context (where, when, why) and any adjustment."""
 
     context: WeatherContext
     bike_adjustment: BikeWeatherAdjustment | None = None
@@ -39,11 +39,11 @@ class ComparisonResult:
     priority: TripPriority
     estimates: tuple[ModeEstimate, ...]
     recommendation: Recommendation
-    weather: WeatherOutcome | None = None  # None = porównanie bez serwisu pogody
+    weather: WeatherOutcome | None = None  # None = comparison without a weather service
 
 
 class ComparisonService:
-    """Liczy szacunki dla wszystkich środków transportu i wybiera rekomendację."""
+    """Compute estimates for all transport modes and pick the recommendation."""
 
     def __init__(
         self,
@@ -67,7 +67,7 @@ class ComparisonService:
         transit_time_provider: TransitTimeProvider | None = None,
         weather: WeatherService | None = None,
     ) -> "ComparisonService":
-        """Domyślny zestaw kalkulatorów. ``transit_time_provider`` to punkt wpięcia GTFS."""
+        """Default set of calculators. ``transit_time_provider`` is where GTFS plugs in."""
         return cls(
             [
                 CarCalculator(params.car),
@@ -95,7 +95,7 @@ class ComparisonService:
             return None
         bike_available = any(e.mode is TransportMode.BIKE and e.available for e in estimates)
         if not bike_available:
-            # Pogoda wpływa tylko na rower — bez niego nie zużywamy limitu zapytań API.
+            # Weather only affects the bike; without it, no API quota is spent.
             return WeatherOutcome(
                 WeatherContext(
                     WeatherStatus.NOT_APPLICABLE,

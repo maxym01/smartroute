@@ -1,4 +1,4 @@
-"""Zapytania do bazy rozkładu GTFS (tylko odczyt)."""
+"""Queries against the GTFS timetable database (read-only)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -10,13 +10,13 @@ from sqlalchemy.orm import Session, aliased
 from app.models.gtfs import GtfsFeed, GtfsRoute, GtfsServiceDate, GtfsStop, GtfsStopTime, GtfsTrip
 from app.services.gtfs.text import fold_text
 
-# pickup_type / drop_off_type = 1 oznacza „brak możliwości wsiadania / wysiadania”.
+# pickup_type / drop_off_type = 1 means "no pickup / no drop-off available".
 NOT_AVAILABLE = 1
 
 
 @dataclass(frozen=True, slots=True)
 class ScheduledRide:
-    """Surowy wynik zapytania: czasy w sekundach GTFS względem dnia kursowania."""
+    """Raw query result: times in GTFS seconds relative to the service day."""
 
     trip_id: str
     route_id: str
@@ -36,10 +36,10 @@ class GtfsRepository:
         self.session = session
 
     def feed(self) -> GtfsFeed | None:
-        """Metadane importu albo ``None``, gdy baza nie zawiera rozkładu."""
+        """Import metadata, or ``None`` when the database contains no timetable."""
         try:
             return self.session.get(GtfsFeed, 1)
-        except OperationalError:  # brak tabel — import nie został wykonany
+        except OperationalError:  # no tables — the import has not been run
             self.session.rollback()
             return None
 
@@ -50,7 +50,7 @@ class GtfsRepository:
         needle = fold_text(query)
         pattern_filter = GtfsStop.search_name.contains(needle, autoescape=True)
         exact_id = or_(GtfsStop.stop_id == query.strip(), GtfsStop.stop_code == query.strip())
-        # Kolejność: dokładne ID/kod, początek nazwy, reszta — w grupie alfabetycznie.
+        # Order: exact ID/code, name prefix, the rest — alphabetical within each group.
         rank = case(
             (exact_id, 0),
             (GtfsStop.search_name.startswith(needle, autoescape=True), 1),
@@ -59,7 +59,7 @@ class GtfsRepository:
         return self.session.scalars(
             select(GtfsStop)
             .where(or_(pattern_filter, exact_id))
-            # search_name, a nie stop_name: binarne sortowanie stawiałoby „Ł…” po „Z…”.
+            # search_name, not stop_name: binary sorting would put "Ł…" after "Z…".
             .order_by(rank, GtfsStop.search_name, GtfsStop.stop_id)
             .limit(limit)
         ).all()
@@ -74,11 +74,11 @@ class GtfsRepository:
         max_departure_secs: int,
         limit: int,
     ) -> list[ScheduledRide]:
-        """Kursy bez przesiadki: odjazd z ``origin`` w oknie czasu, później ``destination``.
+        """Trips without a transfer: leave ``origin`` within the window, then reach ``destination``.
 
-        Kierunek wynika z kolejności przystanków (``stop_sequence`` celu > startu), więc kurs
-        w przeciwną stronę nie zostanie zwrócony. Jeśli kurs odwiedza cel kilka razy (pętla),
-        bierzemy najbliższe wystąpienie.
+        The direction follows from the stop order (destination ``stop_sequence`` > origin), so a
+        trip in the opposite direction is not returned. If a trip visits the destination several
+        times (a loop), the nearest occurrence is used.
         """
         origin = aliased(GtfsStopTime, name="origin")
         destination = aliased(GtfsStopTime, name="destination")

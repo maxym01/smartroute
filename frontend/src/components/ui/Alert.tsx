@@ -22,13 +22,13 @@ interface AlertProps {
   tone?: Tone;
   title?: string;
   children?: ReactNode;
-  /** `alert` przerywa czytnik ekranu — używaj tylko dla błędów wymagających reakcji. */
+  /** `alert` interrupts the screen reader — use it only for errors that need action. */
   role?: 'alert' | 'status';
   action?: ReactNode;
   className?: string;
 }
 
-/** Wspólny komunikat — ikona i tytuł zawsze towarzyszą kolorowi (nie polegamy na samym kolorze). */
+/** Shared message — an icon and a title always accompany the colour (never colour alone). */
 export function Alert({ tone = 'info', title, children, role, action, className = '' }: AlertProps) {
   const { box, icon: Icon, iconClass } = TONES[tone];
   return (

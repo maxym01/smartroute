@@ -30,7 +30,7 @@ def estimate(
     )
 
 
-# Scenariusz z domyślnych parametrów dla 10 km i 1 osoby (patrz test_default_scenario...).
+# Scenario from the default parameters for 10 km and 1 person (see test_default_scenario...).
 CITY = [estimate(CAR, 20.0, 4.55, 1.7), estimate(PT, 35.3, 4.40, 0.5), estimate(BIKE, 40.0, 0, 0)]
 
 recommender = RecommendationService()
@@ -53,22 +53,22 @@ def test_balanced_score_uses_min_max_normalisation_with_equal_weights() -> None:
     rec = recommender.recommend(CITY, TripPriority.BALANCED)
     car, pt, bike = (rec.score_for(m) for m in (CAR, PT, BIKE))
 
-    # car: czas 0, koszt 1, CO₂ 1
+    # car: time 0, cost 1, CO₂ 1
     assert (car.normalized_duration, car.normalized_cost, car.normalized_co2) == (0, 1, 1)
     assert car.balanced_score == pytest.approx(2 / 3, abs=1e-4)
-    # pt: czas (35,3-20)/(40-20), koszt 4,40/4,55, CO₂ 0,5/1,7
+    # pt: time (35.3-20)/(40-20), cost 4.40/4.55, CO₂ 0.5/1.7
     assert pt.normalized_duration == pytest.approx(15.3 / 20, abs=1e-4)
     assert pt.normalized_cost == pytest.approx(4.40 / 4.55, abs=1e-4)
     assert pt.normalized_co2 == pytest.approx(0.5 / 1.7, abs=1e-4)
     assert pt.balanced_score == pytest.approx((15.3 / 20 + 4.40 / 4.55 + 0.5 / 1.7) / 3, abs=1e-4)
-    # bike: czas 1, reszta 0
+    # bike: time 1, the rest 0
     assert bike.balanced_score == pytest.approx(1 / 3, abs=1e-4)
     assert [s.mode for s in rec.scores] == [BIKE, CAR, PT]
     assert [s.rank for s in rec.scores] == [1, 2, 3]
 
 
 def test_fastest_picks_strictly_fastest_even_if_runner_up_is_much_cheaper() -> None:
-    # Ważenie mogłoby tu wybrać rower; leksykograficzny „fastest” nie może.
+    # Weighting could pick the bike here; the lexicographic "fastest" cannot.
     rec = recommender.recommend(
         [estimate(CAR, 20.0, 30, 5), estimate(BIKE, 20.5, 0, 0)], TripPriority.FASTEST
     )
@@ -130,7 +130,7 @@ def test_tie_between_car_and_public_transport_prefers_public_transport() -> None
 
 
 def test_primary_tie_is_resolved_by_secondary_metric_before_fixed_order() -> None:
-    # Ten sam czas — przy „fastest” decyduje niższy koszt, nie stała kolejność.
+    # Same time — with "fastest" the lower cost decides, not the fixed order.
     rec = recommender.recommend(
         [estimate(CAR, 30, 3, 2), estimate(BIKE, 30, 4, 0)], TripPriority.FASTEST
     )
@@ -196,7 +196,7 @@ def test_describe_method_documents_each_priority() -> None:
 
 
 def test_default_scenario_matches_city_fixture() -> None:
-    """Spina wartości z fixture CITY z rzeczywistymi kalkulatorami i domyślną konfiguracją."""
+    """Tie the CITY fixture values to the real calculators and the default settings."""
     service = ComparisonService.from_settings(TransportSettings())
 
     result = service.compare(TripInput(distance_km=10), TripPriority.BALANCED)
@@ -225,7 +225,7 @@ def test_service_handles_large_groups_without_errors() -> None:
 
     result = service.compare(TripInput(distance_km=1000, passengers=8), TripPriority.CHEAPEST)
 
-    # 8 biletów na 1000 km jest droższe niż jedno auto.
+    # 8 tickets for 1000 km cost more than one car.
     assert result.recommendation.mode is CAR
 
 
@@ -236,7 +236,7 @@ def test_service_rejects_duplicate_calculators() -> None:
 
 
 def test_primary_tie_is_explained_in_recommendation() -> None:
-    # Remis czasu przy „fastest”: zwycięzca wybrany kosztem, a uzasadnienie mówi to wprost.
+    # Time tie with "fastest": the winner is chosen by cost, and the explanation says so.
     rec = recommender.recommend(
         [estimate(CAR, 30, 3, 2), estimate(BIKE, 30, 4, 0)], TripPriority.FASTEST
     )

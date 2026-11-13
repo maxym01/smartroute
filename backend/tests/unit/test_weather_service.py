@@ -1,4 +1,4 @@
-"""WeatherService: kiedy wolno użyć bieżącej pogody i skąd brać lokalizację."""
+"""WeatherService: when current weather may be used and where the location comes from."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -97,10 +97,10 @@ def test_missing_departure_is_skipped() -> None:
 @pytest.mark.parametrize(
     ("fields", "locator"),
     [
-        ({"origin_stop_id": None, "origin": "Gdańsk"}, LOCATOR),  # nazwa miasta to nie GPS
+        ({"origin_stop_id": None, "origin": "Gdańsk"}, LOCATOR),  # a city name is not GPS
         ({"origin_stop_id": "NOPE"}, LOCATOR),
-        ({"origin_stop_id": "X"}, LOCATOR),  # przystanek bez współrzędnych
-        ({}, None),  # rozkład GTFS nie zaimportowany
+        ({"origin_stop_id": "X"}, LOCATOR),  # stop without coordinates
+        ({}, None),  # GTFS timetable not imported
     ],
     ids=["city-name-only", "unknown-stop", "stop-without-coords", "no-gtfs"],
 )

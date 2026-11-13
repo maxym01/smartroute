@@ -29,15 +29,15 @@ def get_comparison_service(
     gtfs_db: Annotated[Session | None, Depends(get_gtfs_db)],
     weather_client: Annotated[WeatherbitClient | None, Depends(get_weather_client)],
 ) -> ComparisonService:
-    # Rozkład GTFS jest opcjonalny: bez importu (gtfs_db=None) dostawca zwraca szacunek
-    # parametryczny, a podróże bez przystanków i daty liczone są jak dotychczas.
+    # The GTFS timetable is optional: without an import (gtfs_db=None) the provider returns
+    # the parametric estimate, and trips without stops and a date always use that estimate.
     schedule = ScheduleService(GtfsRepository(gtfs_db)) if gtfs_db is not None else None
     provider = GtfsTransitTimeProvider(
         schedule,
         settings.transport.public_transport,
         window_min=settings.gtfs_search_window_min,
     )
-    # Pogoda: lokalizacja wyłącznie ze współrzędnych przystanku GTFS; każdy błąd = brak korekty.
+    # Weather: location comes only from GTFS stop coordinates; any error = no adjustment.
     weather = WeatherService(
         weather_client,
         GtfsRepository(gtfs_db) if gtfs_db is not None else None,

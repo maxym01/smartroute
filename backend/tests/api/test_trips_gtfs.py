@@ -1,4 +1,4 @@
-"""Pola GTFS w podróżach (kompatybilność wsteczna) i rozkładowy czas w porównaniu."""
+"""GTFS fields on trips (backward compatibility) and the scheduled time in the comparison."""
 
 from typing import Any
 
@@ -92,7 +92,7 @@ def test_patch_rejects_same_stops_after_merge(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-# --- Porównanie ------------------------------------------------------------------------------
+# --- Comparison -----------------------------------------------------------------------------
 
 
 def test_compare_uses_gtfs_schedule_when_connection_exists(gtfs_client: TestClient) -> None:
@@ -101,17 +101,17 @@ def test_compare_uses_gtfs_schedule_when_connection_exists(gtfs_client: TestClie
     variant = public_transport(gtfs_client, trip["id"])
 
     assert variant["data_source"] == "gtfs_schedule"
-    # 07:55 → odjazd 08:00 (5 min oczekiwania) → przyjazd 08:20 = 25 min
+    # 07:55 → departure 08:00 (5 min wait) → arrival 08:20 = 25 min
     assert variant["estimated_duration_min"] == 25.0
     assert "linia 8" in variant["assumptions"][0]
     assert any("bez opóźnień i danych w czasie rzeczywistym" in a for a in variant["assumptions"])
-    # koszt i emisja nadal z parametrów
+    # cost and emissions still come from the parameters
     assert variant["estimated_cost_pln"] == 4.4
 
 
 def test_compare_without_gtfs_fields_is_unchanged(gtfs_client: TestClient) -> None:
-    # Nawet z zaimportowanym rozkładem podróż bez przystanków liczona jest jak dotąd —
-    # bez dodatkowych uwag i bez zgadywania przystanku z nazwy miejsca.
+    # Even with an imported timetable, a trip without stops gets the plain parametric
+    # estimate, with no extra notes and no guessing of a stop from the place name.
     trip = create(gtfs_client, origin="Dworzec Główny 01", destination="Łąkowa 01")
 
     variant = public_transport(gtfs_client, trip["id"])

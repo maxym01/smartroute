@@ -28,9 +28,9 @@ def test_import_loads_feed_with_only_calendar_dates(tmp_path: Path, engine: Engi
     assert report.counts == {
         "stops": 4,
         "routes": 2,
-        "trips": 3,  # TBAD odrzucony (nieznana linia)
-        "stop_times": 9,  # zły czas 25:61 i wiersz kursu TBAD odrzucone
-        "service_dates": 3,  # BAD z nieprawidłową datą odrzucony
+        "trips": 3,  # TBAD rejected (unknown route)
+        "stop_times": 9,  # bad time 25:61 and the TBAD trip row rejected
+        "service_dates": 3,  # BAD with an invalid date rejected
     }
     assert report.skipped == {"calendar_dates.txt": 1, "trips.txt": 1, "stop_times.txt": 2}
     assert report.timezone == "Europe/Warsaw"
@@ -57,13 +57,13 @@ def test_calendar_txt_is_expanded_and_exceptions_applied(tmp_path: Path, engine:
     zip_path = build_gtfs_zip(
         tmp_path / "f.zip",
         overrides={
-            # Pon–pt 09–15.11.2026 (pon 09.11) …
+            # Mon–Fri 09–15.11.2026 (Mon 09.11) …
             "calendar.txt": (
                 "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
                 "start_date,end_date\n"
                 "WD,1,1,1,1,1,0,0,20261109,20261115\n"
             ),
-            # … bez 11.11 (święto), z dodatkową sobotą 14.11.
+            # … without 11.11 (public holiday), with an extra Saturday 14.11.
             "calendar_dates.txt": (
                 "service_id,date,exception_type\nWD,20261111,2\nWD,20261114,1\nNIGHT,20261112,1\n"
             ),
@@ -120,7 +120,7 @@ def test_invalid_feed_fails_and_keeps_previous_data(
     with pytest.raises(GtfsImportError, match=message):
         import_zip(build_gtfs_zip(tmp_path / "bad.zip", **kwargs), engine)
 
-    # Transakcja wycofana — poprzedni rozkład nadal kompletny.
+    # Transaction rolled back — the previous timetable is still complete.
     assert count(engine, GtfsStop) == 4
     assert count(engine, GtfsStopTime) == 9
 
@@ -134,7 +134,7 @@ def test_non_zip_file_is_rejected(tmp_path: Path, engine: Engine) -> None:
 
 
 def test_members_outside_root_are_ignored(tmp_path: Path, engine: Engine) -> None:
-    # Ścieżki z katalogami (w tym "../") nie są ani czytane, ani rozpakowywane na dysk.
+    # Paths with directories (including "../") are neither read nor extracted to disk.
     zip_path = build_gtfs_zip(
         tmp_path / "f.zip",
         extra_members={"../evil.txt": "x", "nested/stops.txt": "stop_id,stop_name\nZ,Zły\n"},
@@ -152,7 +152,7 @@ def test_oversized_member_is_rejected(tmp_path: Path, engine: Engine) -> None:
 
 
 def test_suspicious_compression_ratio_is_rejected(tmp_path: Path, engine: Engine) -> None:
-    # 5 MB zer kompresuje się ~1000:1 — typowy objaw „zip bomby”.
+    # 5 MB of zeros compresses ~1000:1 — a typical sign of a "zip bomb".
     zip_path = build_gtfs_zip(tmp_path / "f.zip", overrides={"feed_info.txt": "0" * 5_000_000})
     assert zipfile.ZipFile(zip_path).getinfo("feed_info.txt").compress_size < 50_000
 

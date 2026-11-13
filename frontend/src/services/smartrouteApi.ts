@@ -10,8 +10,8 @@ import type {
 import { request } from './apiClient';
 
 /**
- * Okno wyszukiwania połączeń dla panelu rozkładu. Odpowiada domyślnemu
- * GTFS_SEARCH_WINDOW_MIN=180 w backendzie, którego używa porównanie podróży.
+ * Connection search window for the timetable panel. Matches the backend default
+ * GTFS_SEARCH_WINDOW_MIN=180 used by the trip comparison.
  */
 export const CONNECTIONS_WINDOW_MIN = 180;
 export const STOP_QUERY_MIN_LENGTH = 2;

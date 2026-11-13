@@ -3,15 +3,15 @@ import type { Connection, ModeEstimate } from '../types/api';
 import { LOCAL_TIME_ZONE } from './format';
 
 /**
- * Jak interpretować wariant „Komunikacja miejska” względem panelu rozkładu.
+ * How to interpret the "Komunikacja miejska" (public transport) option against the timetable panel.
  *
- * - `confirmed` — backend policzył czas z rozkładu GTFS (`gtfs_schedule`); `connection` to kurs
- *   z panelu, który odpowiada założeniom backendu (linia i godzina odjazdu), jeśli udało się go
- *   jednoznacznie dopasować.
- * - `no_connection` — szacunek parametryczny, a rozkład potwierdził brak kursu bezpośredniego
- *   w oknie wyszukiwania. Nie oznacza to braku połączenia z przesiadką.
- * - `schedule_unavailable` — szacunek parametryczny, a rozkładu nie udało się sprawdzić.
- * - `estimate` — szacunek parametryczny z innego powodu (np. backend nie użył rozkładu).
+ * - `confirmed` — the backend computed the time from the GTFS timetable (`gtfs_schedule`);
+ *   `connection` is the panel trip that matches the backend assumptions (line and departure
+ *   time), if it could be matched unambiguously.
+ * - `no_connection` — parametric estimate, and the timetable confirmed there is no direct trip
+ *   in the search window. This does not rule out a connection with a transfer.
+ * - `schedule_unavailable` — parametric estimate, and the timetable could not be checked.
+ * - `estimate` — parametric estimate for another reason (e.g. the backend did not use the timetable).
  */
 export type TransitStatus =
   | { kind: 'confirmed'; connection: Connection | null }
@@ -19,7 +19,7 @@ export type TransitStatus =
   | { kind: 'schedule_unavailable' }
   | { kind: 'estimate' };
 
-/** „12.11.2026 19:11” — format, którego backend używa w założeniach (gtfs_transit.py). */
+/** "12.11.2026 19:11" — the format the backend uses in its assumptions (gtfs_transit.py). */
 export function backendDepartureLabel(iso: string): string {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: LOCAL_TIME_ZONE,
@@ -35,7 +35,7 @@ export function backendDepartureLabel(iso: string): string {
   return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}`;
 }
 
-/** Kurs z panelu rozkładu, którego użył backend — dopasowany po linii i godzinie odjazdu. */
+/** The timetable panel trip the backend used — matched by line and departure time. */
 export function findUsedConnection(
   variant: ModeEstimate,
   connections: Connection[],

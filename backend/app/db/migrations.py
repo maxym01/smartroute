@@ -1,8 +1,8 @@
-"""Minimalne, idempotentne migracje schematu (Alembic jest poza zakresem MVP).
+"""Minimal, idempotent schema migrations (Alembic is out of the MVP scope).
 
-``create_all`` tworzy brakujące tabele, ale nie dodaje kolumn do istniejących. Tu dodajemy
-nowe kolumny *nullable* przez ``ALTER TABLE ... ADD COLUMN`` — w SQLite to operacja
-natychmiastowa, nie przepisuje tabeli i nie zmienia istniejących wierszy.
+``create_all`` creates missing tables but does not add columns to existing ones. Here new
+*nullable* columns are added with ``ALTER TABLE ... ADD COLUMN``. In SQLite this is an
+instant operation that does not rewrite the table or change existing rows.
 """
 
 import logging
@@ -11,7 +11,7 @@ from sqlalchemy import Engine, inspect
 
 logger = logging.getLogger(__name__)
 
-# tabela → [(kolumna, definicja SQL)] — tylko kolumny nullable bez wartości domyślnej.
+# table → [(column, SQL definition)] — only nullable columns without a default value.
 ADDED_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "trips": [
         ("origin_stop_id", "VARCHAR(64)"),
@@ -22,7 +22,7 @@ ADDED_COLUMNS: dict[str, list[tuple[str, str]]] = {
 
 
 def upgrade_schema(engine: Engine) -> list[str]:
-    """Dodaje brakujące kolumny. Zwraca listę dodanych (``tabela.kolumna``)."""
+    """Add missing columns. Return the list of added ones (``table.column``)."""
     added: list[str] = []
     with engine.begin() as conn:
         inspector = inspect(conn)

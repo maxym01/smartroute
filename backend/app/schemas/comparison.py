@@ -1,4 +1,4 @@
-"""Schematy odpowiedzi porównania. Mapują wyniki domenowe z warstwy services na kontrakt API."""
+"""Comparison response schemas: map domain results from the services layer to the API contract."""
 
 from datetime import datetime
 from typing import Literal

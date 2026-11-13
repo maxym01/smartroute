@@ -15,7 +15,7 @@ interface ResultsSectionProps {
   result: ComparisonResult;
   isRefreshing: boolean;
   onPriorityChange: (priority: TripPriority) => void;
-  /** Przenosi do formularza (zmiana przystanków, daty, godziny). */
+  /** Moves to the form (to change stops, date or time). */
   onEditTrip: () => void;
 }
 
@@ -30,7 +30,7 @@ export function ResultsSection({
   const best = bestMetrics(comparison.variants);
   const rankedCount = comparison.variants.filter((variant) => variant.available).length;
   const transitVariant = comparison.variants.find((variant) => variant.mode === 'public_transport');
-  // Jedno źródło prawdy dla karty komunikacji i panelu odjazdów.
+  // Single source of truth for the public transport card and the departures panel.
   const transit = transitVariant ? transitStatus(transitVariant, schedule) : undefined;
   const usedConnection = transit?.kind === 'confirmed' ? transit.connection : null;
 
@@ -91,7 +91,7 @@ export function ResultsSection({
           <h2 id="variants-title" className="sr-only">
             Porównanie wariantów
           </h2>
-          {/* 3 kolumny tylko od xl (karta ≥ ~19rem); 2 + 1 na tabletach, 1 na telefonach. */}
+          {/* 3 columns only from xl (card ≥ ~19rem); 2 + 1 on tablets, 1 on phones. */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {variants.map((variant, index) => (
               <div

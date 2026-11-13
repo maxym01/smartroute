@@ -1,4 +1,4 @@
-"""Silnik SQLAlchemy, fabryka sesji i zależność FastAPI ``get_db``."""
+"""SQLAlchemy engine, session factory and the ``get_db`` FastAPI dependency."""
 
 from collections.abc import Iterator
 from typing import Any
@@ -12,7 +12,7 @@ from app.core.config import get_settings
 
 
 def build_engine(database_url: str, *, echo: bool = False) -> Engine:
-    """Tworzy silnik; dla SQLite wyłącza check_same_thread, a in-memory dzieli jedno połączenie."""
+    """Create the engine; SQLite disables check_same_thread and in-memory shares one connection."""
     url = make_url(database_url)
     kwargs: dict = {"echo": echo}
     if url.get_backend_name() == "sqlite":
@@ -26,7 +26,7 @@ def build_engine(database_url: str, *, echo: bool = False) -> Engine:
 
 
 def _register_unicode_lower(dbapi_connection: Any, _: Any) -> None:
-    # Wbudowane lower() w SQLite obsługuje tylko ASCII — nadpisujemy je, by "Ł" == "ł".
+    # SQLite's built-in lower() handles ASCII only — override it so that "Ł" == "ł".
     dbapi_connection.create_function(
         "lower",
         1,

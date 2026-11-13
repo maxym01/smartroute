@@ -1,9 +1,9 @@
-"""Mały syntetyczny feed GTFS do testów offline (bez sieci).
+"""Small synthetic GTFS feed for offline tests (no network).
 
-Sieć: linia tramwajowa 8 (A1 → B1 → C1, kurs T1 i powrotny T2) w dni robocze 12–13.11.2026
-oraz nocna N1 (T3: A1 23:50 → B1 24:05 → C1 24:20) tylko w kalendarzu 12.11.2026.
-Przystanek D1 nie ma żadnych połączeń. Jest tylko calendar_dates.txt (jak w ZTM Gdańsk),
-a niektóre wiersze są celowo błędne.
+Network: tram line 8 (A1 → B1 → C1, trip T1 and return trip T2) on weekdays 12–13.11.2026
+and night line N1 (T3: A1 23:50 → B1 24:05 → C1 24:20) only on the 12.11.2026 calendar.
+Stop D1 has no connections. There is only calendar_dates.txt (as in ZTM Gdańsk),
+and some rows are deliberately malformed.
 """
 
 import zipfile
@@ -30,7 +30,7 @@ DEFAULT_FILES: dict[str, str] = {
         "R8,0,8,,900\n"
         "RN,0,N1,,700\n"
     ),
-    # CRLF jak w prawdziwym feedzie ZTM; ostatni wiersz ma nieprawidłową datę.
+    # CRLF as in the real ZTM feed; the last row has an invalid date.
     "calendar_dates.txt": (
         "service_id,date,exception_type\r\n"
         "WD,20261112,1\r\n"

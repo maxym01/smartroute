@@ -11,7 +11,7 @@ export type StopSearchState =
 
 const DEBOUNCE_MS = 250;
 
-/** Wyszukiwanie przystanków GTFS z opóźnieniem i anulowaniem nieaktualnych żądań. */
+/** Debounced GTFS stop search that cancels stale requests. */
 export function useStopSearch(query: string, enabled = true): StopSearchState {
   const [state, setState] = useState<StopSearchState>({ status: 'idle', items: [] });
   const trimmed = query.trim();

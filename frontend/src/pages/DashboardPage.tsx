@@ -50,7 +50,7 @@ export function DashboardPage() {
 
   const updateValues = useCallback((patch: Partial<TripFormValues>) => {
     setValues((current) => ({ ...current, ...patch }));
-    // Błąd z serwera dotyczy wysłanej wartości — po edycji pola go ukrywamy.
+    // A server error refers to the submitted value — hide it once the field is edited.
     setServerErrors((current) => {
       const next = { ...current };
       for (const key of Object.keys(patch)) {
@@ -70,7 +70,7 @@ export function DashboardPage() {
       if (outcome.ok) {
         reportBackend(true);
         setAnnouncement('Porównanie gotowe. Wyniki poniżej.');
-        // Wyniki są pod formularzem — przewijamy do nich, jeśli zaczynają się poniżej połowy ekranu.
+        // Results are below the form — scroll to them if they start below the middle of the screen.
         const top = resultsRef.current?.getBoundingClientRect().top ?? 0;
         if (top > window.innerHeight * 0.5) {
           resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -78,7 +78,7 @@ export function DashboardPage() {
       } else if ('error' in outcome) {
         setAnnouncement('Nie udało się wykonać porównania.');
         const caught = outcome.error;
-        // Błędy 422 trafiają do konkretnych pól, brak sieci aktualizuje status backendu.
+        // 422 errors go to specific fields; a network failure updates the backend status.
         if (caught instanceof ApiError && caught.kind === 'validation') {
           setServerErrors(mapValidationIssues(caught.issues).fields);
         }
@@ -92,13 +92,13 @@ export function DashboardPage() {
     void execute(toTripPayload(values));
   };
 
-  // Szybkie przeliczenie dla ostatnio wysłanej podróży — bez ponownej walidacji formularza.
+  // Quick recalculation for the last submitted trip — without validating the form again.
   const handlePriorityChange = (priority: TripPriority) => {
     updateValues({ priority });
     if (lastPayload) void execute({ ...lastPayload, priority });
   };
 
-  // Powrót do formularza: przewinięcie i focus na pierwszym polu (heurystyka 3).
+  // Back to the form: scroll and focus the first field (heuristic 3).
   const editTrip = () => {
     document.getElementById('trip-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById(FIELD_IDS.origin)?.focus({ preventScroll: true });

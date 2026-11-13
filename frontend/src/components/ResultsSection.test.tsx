@@ -44,7 +44,7 @@ const transitUnavailable = variant({
   unavailable_reason: 'Brak połączenia testowego.',
   score: null,
 });
-// Wariant z szacunku parametrycznego (tak jak przy Dworzec Główny 02 → Zaspa 01).
+// Option based on the parametric estimate (as for Dworzec Główny 02 → Zaspa 01).
 const transitEstimate = variant({
   mode: 'public_transport',
   label: 'Komunikacja miejska',
@@ -55,7 +55,7 @@ const transitEstimate = variant({
   assumptions: ['Brak bezpośredniego połączenia w rozkładzie GTFS w ciągu 180 min. Użyto szacunku parametrycznego.'],
   score: { rank: 3, normalized_duration: 0.9, normalized_cost: 1, normalized_co2: 0.6, balanced_score: 0.83, weather_demoted: false },
 });
-// Wariant z rozkładu — założenia w formacie backendu (gtfs_transit.py).
+// Option from the timetable — assumptions in the backend format (gtfs_transit.py).
 const transitScheduled = variant({
   ...transitEstimate,
   estimated_duration_min: 25,
@@ -165,7 +165,7 @@ describe('ResultsSection', () => {
     renderResults(makeResult([car, transitUnavailable, bike]));
 
     expect(screen.getByRole('heading', { level: 2, name: 'Rower' })).toBeInTheDocument();
-    // Lead to pierwsze zdanie uzasadnienia; pełny tekst w sekcji rozwijanej.
+    // The lead is the first sentence of the explanation; the full text is in the expandable section.
     expect(screen.getByText('Rower daje najlepszy kompromis (z backendu).')).toBeInTheDocument();
     expect(screen.getByText(/Względem wariantu „Samochód”: 9 min dłużej\./)).toBeInTheDocument();
 
@@ -245,7 +245,7 @@ describe('ResultsSection', () => {
     expect(warning).toHaveTextContent('nie znaleziono potwierdzonego kursu bezpośredniego GTFS w ciągu 180 min');
     expect(warning).toHaveTextContent('połączeń z przesiadkami aplikacja nie sprawdza');
     expect(warning).toHaveTextContent('nie gwarantuje dostępnego połączenia');
-    // Komunikacja nadal jest w rankingu — brak kursu bezpośredniego ≠ brak komunikacji.
+    // Public transport stays in the ranking — no direct trip ≠ no public transport.
     const card = screen.getByRole('article', { name: 'Komunikacja miejska' });
     expect(within(card).getByText('Rekomendowany')).toBeInTheDocument();
     expect(within(card).queryByText('Pominięty')).not.toBeInTheDocument();
@@ -266,7 +266,7 @@ describe('ResultsSection', () => {
   });
 
   it('oznacza remis najkrótszego czasu jako ex aequo w kartach i w panelu', () => {
-    // 13,2 i 13,4 min wyświetlają się jako „13 min” — żaden nie może być „jedynym najkrótszym”.
+    // 13.2 and 13.4 min are both shown as "13 min" — neither can be the "only shortest".
     const fastBike = variant({ ...bike, estimated_duration_min: 13.4 });
     renderResults(makeResult([car, fastBike, transitEstimate], { status: 'loading' }, car));
 

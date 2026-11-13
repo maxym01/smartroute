@@ -1,4 +1,4 @@
-"""Bieżąca pogoda (Weatherbit) i jej wpływ na wariant „Rower”."""
+"""Current weather (Weatherbit) and its effect on the "Bike" option."""
 
 from app.services.weather.adjustment import BikeWeatherAdjustment, WeatherAdjustmentService
 from app.services.weather.client import (

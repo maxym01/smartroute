@@ -13,10 +13,10 @@ from app.services.transport.base import (
 
 
 class CarCalculator:
-    """Samochód: czas = dystans / prędkość + parkowanie; koszt = tylko paliwo dla całego auta.
+    """Car: time = distance / speed + parking; cost = fuel only, for the whole car.
 
-    Koszt i emisja dotyczą pojazdu, więc nie rosną z liczbą osób — wartości „na pasażera”
-    to równy podział między wszystkich jadących.
+    Cost and emissions belong to the vehicle, so they do not grow with the number of people;
+    the "per passenger" values are an equal split among everyone in the car.
     """
 
     mode = TransportMode.CAR

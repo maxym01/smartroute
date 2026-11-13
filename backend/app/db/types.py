@@ -6,9 +6,10 @@ from sqlalchemy.types import TypeDecorator
 
 
 class UTCDateTime(TypeDecorator[datetime]):
-    """Data ze strefą zapisywana w bazie jako UTC (bez strefy) i odczytywana jako świadoma UTC.
+    """Aware datetime stored in the database as naive UTC and read back as aware UTC.
 
-    SQLite nie przechowuje stref — bez tej konwersji zapisałyby się „gołe” cyfry czasu lokalnego.
+    SQLite does not store time zones; without this conversion the bare local time digits
+    would be saved.
     """
 
     impl = DateTime

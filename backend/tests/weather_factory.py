@@ -1,4 +1,4 @@
-"""Mockowane odpowiedzi Weatherbit ``/current`` (format jak w dokumentacji, ``units=M``)."""
+"""Mocked Weatherbit ``/current`` responses (documented format, ``units=M``)."""
 
 import json
 import urllib.error
@@ -44,7 +44,7 @@ STRONG_WIND = current_payload(wind_spd=12.0, code=804, description="Overcast clo
 
 
 class FakeFetch:
-    """Zastępuje HTTP: zwraca kolejne odpowiedzi (dict → JSON, wyjątek → raise) i zapisuje URL-e."""
+    """Replace HTTP: return successive responses (dict → JSON, exception → raise) and store URLs."""
 
     def __init__(self, *responses: dict[str, Any] | Exception | bytes) -> None:
         self.responses = list(responses)

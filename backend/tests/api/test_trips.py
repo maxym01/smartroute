@@ -229,7 +229,7 @@ def test_list_trips_search_by_name_origin_and_destination(client: TestClient, cr
     assert search("DWORZEC") == {by_origin["id"], by_destination["id"]}
     assert search("  lotnisko ") == {by_origin["id"]}
     assert search("brak-wyników") == set()
-    assert len(search("   ")) == 4  # pusta fraza = brak filtra
+    assert len(search("   ")) == 4  # empty phrase = no filter
 
 
 def test_list_trips_search_is_case_insensitive_for_polish_letters(
@@ -273,7 +273,7 @@ def test_replace_trip_overwrites_all_fields(client: TestClient, create_trip) -> 
     body = response.json()
     for key, value in replacement.items():
         assert body[key] == value
-    assert body["notes"] is None  # pominięte pole wraca do wartości domyślnej
+    assert body["notes"] is None  # an omitted field reverts to its default value
     assert body["id"] == created["id"]
     assert body["created_at"] == created["created_at"]
     assert client.get(f"{TRIPS_URL}/{created['id']}").json() == body
@@ -431,7 +431,7 @@ def test_delete_trip_twice_returns_404_second_time(client: TestClient, create_tr
     assert client.delete(f"{TRIPS_URL}/{created['id']}").status_code == 404
 
 
-# --- izolacja bazy ---------------------------------------------------------------------------
+# --- database isolation ----------------------------------------------------------------------
 
 
 def test_database_is_isolated_between_tests_part_1(client: TestClient, create_trip) -> None:

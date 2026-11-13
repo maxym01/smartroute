@@ -3,7 +3,7 @@ import { formatCo2, formatCost, formatDuration } from './format';
 
 export type MetricKey = 'duration' | 'cost' | 'co2';
 
-/** Metryka, w której wariant jest najlepszy; `sharedWith` ≠ [] oznacza remis (ex aequo). */
+/** A metric in which the option is the best; `sharedWith` ≠ [] means a tie (ex aequo). */
 export interface BestMetric {
   metric: MetricKey;
   sharedWith: TransportMode[];
@@ -15,8 +15,8 @@ const METRIC_VALUE: Record<MetricKey, (variant: ModeEstimate) => number> = {
   co2: (variant) => variant.estimated_co2_kg,
 };
 
-// Porównujemy wartości tak, jak widzi je użytkownik (np. 13,2 i 13,4 min → „13 min”),
-// żeby oznaczenie „najkrótszy” nigdy nie wyróżniało jednej z dwóch identycznie wyglądających liczb.
+// Values are compared as the user sees them (e.g. 13.2 and 13.4 min → "13 min"),
+// so that the "shortest" badge never singles out one of two identical-looking numbers.
 const METRIC_DISPLAY: Record<MetricKey, (value: number) => string> = {
   duration: formatDuration,
   cost: formatCost,
@@ -24,8 +24,8 @@ const METRIC_DISPLAY: Record<MetricKey, (value: number) => string> = {
 };
 
 /**
- * Wskazuje najlepszą wartość każdej metryki wśród dostępnych wariantów.
- * To wyłącznie opis danych z backendu — o rekomendacji decyduje backend.
+ * Finds the best value of each metric among the available options.
+ * This only describes the backend data — the backend decides the recommendation.
  */
 export function bestMetrics(variants: ModeEstimate[]): Map<TransportMode, BestMetric[]> {
   const available = variants.filter((variant) => variant.available);
@@ -35,7 +35,7 @@ export function bestMetrics(variants: ModeEstimate[]): Map<TransportMode, BestMe
     const shown = (variant: ModeEstimate) => METRIC_DISPLAY[metric](METRIC_VALUE[metric](variant));
     const best = METRIC_DISPLAY[metric](Math.min(...available.map(METRIC_VALUE[metric])));
     const leaders = available.filter((variant) => shown(variant) === best);
-    if (leaders.length === available.length) continue; // wszyscy równi — nic nie wyróżniamy
+    if (leaders.length === available.length) continue; // all equal — highlight nothing
     for (const variant of leaders) {
       const sharedWith = leaders.filter((other) => other !== variant).map((other) => other.mode);
       result.set(variant.mode, [...(result.get(variant.mode) ?? []), { metric, sharedWith }]);
@@ -44,7 +44,7 @@ export function bestMetrics(variants: ModeEstimate[]): Map<TransportMode, BestMe
   return result;
 }
 
-/** Dostępne warianty według rankingu backendu, niedostępne na końcu. */
+/** Available options in backend ranking order, unavailable ones last. */
 export function sortVariants(variants: ModeEstimate[]): ModeEstimate[] {
   const rank = (variant: ModeEstimate) => variant.score?.rank ?? Number.POSITIVE_INFINITY;
   return [...variants].sort((a, b) => rank(a) - rank(b));
@@ -59,8 +59,9 @@ export function passengersLabel(count: number): string {
 }
 
 /**
- * Pierwsze zdanie uzasadnienia backendu jako „lead”; pełny tekst pozostaje w sekcji rozwijanej.
- * Dzielimy tylko przed wielką literą, więc skróty typu „ok. 22 min” nie rozbijają zdania.
+ * First sentence of the backend explanation as the "lead"; the full text stays in the
+ * expandable section. Splits only before an upper-case letter, so abbreviations such as
+ * "ok. 22 min" do not break the sentence.
  */
 export function splitExplanation(explanation: string): { lead: string; rest: string } {
   const [lead = explanation, ...rest] = explanation.split(/(?<=\.)\s+(?=[A-ZĄĆĘŁŃÓŚŹŻ„])/u);

@@ -1,12 +1,13 @@
-"""Tabele rozkładu GTFS Static w osobnej bazie SQLite (``GTFS_DATABASE_URL``).
+"""GTFS Static timetable tables in a separate SQLite database (``GTFS_DATABASE_URL``).
 
-Mają własne ``GtfsBase``, więc ``create_all`` bazy podróży ich nie tworzy. Tworzy je
-i wypełnia wyłącznie importer (``python -m app.gtfs import``).
+They have their own ``GtfsBase``, so the trips database's ``create_all`` does not create
+them. Only the importer creates and fills them (``python -m app.cli.gtfs import``).
 
-Uproszczenia względem specyfikacji GTFS:
-- kalendarz jest zmaterializowany do par (service_id, data) z calendar.txt i calendar_dates.txt,
-- czasy są zapisane jako sekundy od „południa minus 12 h” dnia kursowania (mogą być >= 24 h),
-- kurs ma techniczny klucz całkowity ``trip_pk`` (oszczędność miejsca w stop_times).
+Simplifications compared with the GTFS specification:
+- the calendar is materialized into (service_id, date) pairs from calendar.txt and
+  calendar_dates.txt,
+- times are stored as seconds from "noon minus 12 h" of the service day (may be >= 24 h),
+- a trip has a technical integer key ``trip_pk`` (saves space in stop_times).
 """
 
 from datetime import datetime
@@ -16,18 +17,18 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class GtfsBase(DeclarativeBase):
-    """Bazowa klasa modeli rozkładu (osobne metadata od modeli aplikacji)."""
+    """Base class for timetable models (metadata separate from the application models)."""
 
 
 class GtfsFeed(GtfsBase):
-    """Metadane ostatniego udanego importu (zawsze jeden wiersz, id=1)."""
+    """Metadata of the last successful import (always a single row, id=1)."""
 
     __tablename__ = "gtfs_feed"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source: Mapped[str] = mapped_column(String(1000))
     sha256: Mapped[str] = mapped_column(String(64))
-    imported_at: Mapped[datetime] = mapped_column(DateTime)  # UTC, bez strefy
+    imported_at: Mapped[datetime] = mapped_column(DateTime)  # UTC, naive
     timezone: Mapped[str] = mapped_column(String(64))
     valid_from: Mapped[int | None] = mapped_column(Integer)  # YYYYMMDD
     valid_to: Mapped[int | None] = mapped_column(Integer)  # YYYYMMDD
@@ -48,7 +49,7 @@ class GtfsStop(GtfsBase):
     stop_code: Mapped[str | None] = mapped_column(String(64))
     stop_lat: Mapped[float | None] = mapped_column(Float)
     stop_lon: Mapped[float | None] = mapped_column(Float)
-    # Nazwa bez wielkości liter i polskich znaków — do wyszukiwania ("Główny" ~ "glowny").
+    # Name folded to lowercase without Polish diacritics, for search ("Główny" ~ "glowny").
     search_name: Mapped[str] = mapped_column(String(200))
 
 
@@ -73,7 +74,7 @@ class GtfsTrip(GtfsBase):
 
 
 class GtfsServiceDate(GtfsBase):
-    """Dzień, w którym kursuje dana usługa (service_id)."""
+    """A day on which a given service (service_id) runs."""
 
     __tablename__ = "gtfs_service_dates"
     __table_args__ = {"sqlite_with_rowid": False}
@@ -85,7 +86,7 @@ class GtfsServiceDate(GtfsBase):
 class GtfsStopTime(GtfsBase):
     __tablename__ = "gtfs_stop_times"
     __table_args__ = (
-        # Wyszukiwanie odjazdów z przystanku w oknie czasowym.
+        # Looking up departures from a stop within a time window.
         Index("ix_gtfs_stop_times_stop_departure", "stop_id", "departure_secs"),
         {"sqlite_with_rowid": False},
     )

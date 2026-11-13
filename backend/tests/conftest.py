@@ -1,4 +1,4 @@
-"""Wspólne fixture'y: SQLite in-memory (StaticPool), override get_db i TestClient."""
+"""Shared fixtures: in-memory SQLite (StaticPool), get_db override and TestClient."""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -29,7 +29,7 @@ def test_settings() -> Settings:
         environment="test",
         database_url=TEST_DATABASE_URL,
         cors_origins=TEST_CORS_ORIGINS,
-        # Jawnie None: klucz ze zmiennej środowiskowej nie może włączyć sieci w testach.
+        # Explicit None: a key from an environment variable must not enable network calls in tests.
         weatherbit_api_key=None,
     )
 
@@ -66,10 +66,10 @@ def app(test_settings: Settings, engine: Engine) -> FastAPI:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_settings] = lambda: test_settings
-    # Domyślnie testy nie widzą żadnego rozkładu (nigdy lokalnego gtfs.db). Testy GTFS
-    # podmieniają tę zależność na bazę zbudowaną z syntetycznego ZIP-a.
+    # By default tests see no timetable (never the local gtfs.db). GTFS tests replace
+    # this dependency with a database built from the synthetic ZIP.
     app.dependency_overrides[get_gtfs_db] = lambda: None
-    # Pogoda domyślnie wyłączona; testy pogody podmieniają klienta na mock bez sieci.
+    # Weather is disabled by default; weather tests replace the client with an offline mock.
     app.dependency_overrides[get_weather_client] = lambda: None
     return app
 
@@ -90,7 +90,7 @@ def gtfs_zip(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def gtfs_engine(tmp_path: Path, gtfs_zip: Path) -> Iterator[Engine]:
-    """Plikowa baza rozkładu zaimportowana z syntetycznego ZIP-a."""
+    """File-based timetable database imported from the synthetic ZIP."""
     engine = build_gtfs_engine(f"sqlite:///{tmp_path / 'gtfs.db'}")
     import_zip(gtfs_zip, engine)
     yield engine
@@ -99,7 +99,7 @@ def gtfs_engine(tmp_path: Path, gtfs_zip: Path) -> Iterator[Engine]:
 
 @pytest.fixture
 def gtfs_client(app: FastAPI, gtfs_engine: Engine) -> Iterator[TestClient]:
-    """Klient API z podpiętym zaimportowanym rozkładem."""
+    """API client wired to the imported timetable."""
     session_factory = build_session_factory(gtfs_engine)
 
     def override_get_gtfs_db() -> Iterator[Session]:
