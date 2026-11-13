@@ -4,7 +4,19 @@ Full-stack MVP do porównywania środków transportu (samochód, transport publi
 
 **Stack:** Python 3.12, FastAPI, SQLite, SQLAlchemy 2.0 · React, TypeScript, Tailwind CSS (Vite)
 
-> Status: propozycja do zatwierdzenia. Implementacja jeszcze nie rozpoczęta.
+> Status: archiwalny dokument planistyczny sprzed implementacji. Aktualny stan projektu opisuje
+> [README.md](README.md) (EN) oraz [docs/README.pl.md](docs/README.pl.md) (PL).
+>
+> Najważniejsze różnice między tym planem a implementacją:
+>
+> - Priorytety `fastest`, `cheapest` i `greenest` używają porządku leksykograficznego, a nie wag
+>   0.7 / 0.2 / 0.1. Wagi po 1/3 zostały tylko dla `balanced`.
+> - Porównanie jest pod `GET /trips/{id}/compare`. Endpointy `POST /comparisons`
+>   i `/transport-modes` nie powstały.
+> - Frontend to jeden dashboard (bez routera, listy podróży i szybkiego porównania), bez
+>   TanStack Query, react-hook-form, zod i MSW.
+> - Poza planem dodano rozkład GTFS Static ZTM Gdańsk (`/stops`, `/connections`) oraz
+>   opcjonalną pogodę bieżącą Weatherbit.
 
 ---
 

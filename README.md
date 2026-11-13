@@ -1,113 +1,165 @@
 # SmartRoute AI
 
-Aplikacja full-stack (FastAPI + React) do porównywania środków transportu (samochód, komunikacja
-miejska, rower) pod kątem
-**czasu, kosztu i szacowanej emisji CO₂**, z zapisywaniem podróży i rekomendacją środka transportu
-według wybranego priorytetu.
+SmartRoute AI is a full-stack web application (FastAPI + React) that compares **car**, **public
+transport** and **bike** for a trip in Gdańsk by **travel time, cost and estimated CO₂ emissions**,
+and recommends one option for the priority you choose (fastest, cheapest, greenest or balanced).
 
-> **Status:** MVP: backend REST API oraz frontend React + TypeScript
-> ([szczegóły](#frontend-react--typescript)).
-> Koszty i emisje to **szacunki z uproszczonego modelu parametrycznego**, a nie bieżące ceny
-> paliwa czy oficjalne taryfy. Czas komunikacji miejskiej pochodzi z **planowego rozkładu
-> GTFS Static ZTM Gdańsk**, jeśli podróż ma przystanki i datę wyjazdu, a rozkład został
-> zaimportowany. W przeciwnym razie używany jest szacunek. Aplikacja nie korzysta z danych
-> w czasie rzeczywistym.
+- Public transport times come from the **official GTFS Static timetable of ZTM Gdańsk** when a
+  direct connection exists. These are scheduled times, without live delays. Otherwise the app
+  falls back to a clearly labelled estimate.
+- **Current weather from Weatherbit** (optional, current conditions only, not a forecast)
+  adjusts the bike option's comfort level and, in strong wind, its travel time.
+- Car and bike times, costs and emissions are **estimates from a simple parametric model**.
+  They are not traffic data, live fuel prices, official fares or measurements. The UI and the
+  API label every value accordingly.
 
-## Spis treści
+> **Status:** working MVP. The user interface and API messages are in Polish. A more detailed
+> Polish version of this document is in [`docs/README.pl.md`](docs/README.pl.md). The project
+> was built with substantial help from AI tools; see
+> [AI-assisted development](#ai-assisted-development).
 
-- [Zaimplementowane funkcje](#zaimplementowane-funkcje)
-- [Stack technologiczny](#stack-technologiczny)
-- [Wymagania](#wymagania)
-- [Szybki start (Windows)](#szybki-start-windows)
-- [Uruchomienie backendu](#uruchomienie-backendu)
-- [Frontend (React + TypeScript)](#frontend-react--typescript)
-- [Konfiguracja](#konfiguracja)
-- [Baza danych](#baza-danych)
-- [Rozkład GTFS (ZTM Gdańsk)](#rozkład-gtfs-ztm-gdańsk)
-- [Pogoda bieżąca (Weatherbit)](#pogoda-bieżąca-weatherbit)
-- [API: przykładowe żądania](#api-przykładowe-żądania)
-- [Testy i jakość kodu](#testy-i-jakość-kodu)
-- [Struktura projektu](#struktura-projektu)
-- [Ograniczenia MVP](#ograniczenia-mvp)
-- [Planowane funkcje](#planowane-funkcje)
+## Demo
 
-## Zaimplementowane funkcje
+> 🎬 **Demo recording:** _coming soon — link will be added here._
+>
+> <!-- Replace with e.g. [![Demo](docs/demo-thumbnail.png)](https://...) -->
 
-- **Frontend (dashboard)** ([szczegóły](#frontend-react--typescript)): formularz podróży
-  z wyszukiwarką przystanków GTFS, wyniki porównania, rekomendacja, najbliższe odjazdy z rozkładu
-  i pogoda bieżąca. Działa bez Swagger UI.
-- **CRUD podróży** (`/api/v1/trips`): tworzenie, lista z paginacją i wyszukiwaniem (bez względu
-  na wielkość liter, także dla polskich znaków), odczyt, pełna (`PUT`) i częściowa (`PATCH`)
-  aktualizacja, usuwanie.
-- **Walidacja danych wejściowych**: dystans 0–1000 km, 1–8 pasażerów, punkt startu i cel muszą się
-  różnić, nieznane pola są odrzucane, a w `PATCH` nie można ustawić pól wymaganych na `null`.
-- **Porównanie środków transportu** (`GET /api/v1/trips/{id}/compare`): dla każdego wariantu
-  zwraca czas od drzwi do drzwi, koszt (łączny i na osobę), emisję CO₂ (łączną i na osobę),
-  dostępność wariantu z powodem niedostępności oraz listę przyjętych założeń.
-- **Rekomendacja** według priorytetu `fastest`, `cheapest`, `greenest` lub `balanced`
-  (normalizacja min-max, wagi po 1/3, deterministyczny tie-break) wraz z opisem w języku polskim.
-  Priorytet można nadpisać parametrem zapytania bez zapisywania go w bazie.
-- **Parametry modelu w konfiguracji** (prędkości, spalanie, ceny, emisje), które można nadpisać
-  zmiennymi środowiskowymi.
-- **Rozkład GTFS Static ZTM Gdańsk** ([szczegóły](#rozkład-gtfs-ztm-gdańsk)):
-  - importer CLI z URL lub lokalnego ZIP-a,
-  - wyszukiwanie przystanków (`GET /api/v1/stops`),
-  - bezpośrednie połączenia według kalendarza kursowania (`GET /api/v1/connections`),
-  - opcjonalne pola podróży `origin_stop_id`, `destination_stop_id` i `departure_at`; gdy są
-    ustawione, porównanie używa czasu z rozkładu (`data_source: "gtfs_schedule"`).
-- **Pogoda bieżąca Weatherbit** ([szczegóły](#pogoda-bieżąca-weatherbit)): opcjonalna,
-  jawna korekta komfortu i czasu roweru dla podróży „teraz”, z cache i bezpiecznym
-  fallbackiem.
-- **Health check** (`/api/v1/health`) ze sprawdzeniem połączenia z bazą.
-- **Spójny format błędów** `{"detail": ..., "code": "not_found" | "validation_error" | "gtfs_not_imported"}`.
-- **CORS** skonfigurowany pod przyszły frontend (domyślnie Vite dev server).
+## Table of contents
 
-## Stack technologiczny
+- [Features](#features)
+- [What is real data and what is estimated](#what-is-real-data-and-what-is-estimated)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [GTFS integration (ZTM Gdańsk)](#gtfs-integration-ztm-gdańsk)
+- [Weather integration (Weatherbit)](#weather-integration-weatherbit)
+- [Comparison model and recommendation](#comparison-model-and-recommendation)
+- [API overview](#api-overview)
+- [Testing and code quality](#testing-and-code-quality)
+- [Project structure](#project-structure)
+- [AI-assisted development](#ai-assisted-development)
+- [Known limitations](#known-limitations)
+- [Possible next steps](#possible-next-steps)
 
-| Obszar      | Technologia                                    |
-|-------------|------------------------------------------------|
-| Język       | Python 3.12                                    |
-| Framework   | FastAPI, Uvicorn                               |
-| Baza danych | SQLite, SQLAlchemy 2.0 (ORM)                   |
-| Rozkład     | GTFS Static (stdlib `csv`/`zipfile`/`zoneinfo` + `tzdata`) |
-| Walidacja   | Pydantic v2, pydantic-settings                 |
-| Testy       | pytest, pytest-cov, httpx (FastAPI TestClient) |
-| Lint/format | Ruff                                           |
-| Frontend    | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, Lucide React |
-| Testy (FE)  | Vitest, Testing Library, jsdom; ESLint (typescript-eslint, react-hooks) |
+## Features
 
-Zależności są zdefiniowane w [`backend/pyproject.toml`](backend/pyproject.toml). Zweryfikowane,
-przypięte wersje są w [`backend/requirements-lock.txt`](backend/requirements-lock.txt), który
-`setup.ps1` stosuje jako plik constraints.
+**Frontend (single-page dashboard)**
 
-## Wymagania
+- Trip planner with accessible GTFS stop search (ARIA combobox: arrow keys, Enter, Escape),
+  swap direction, date and time in Europe/Warsaw (defaults to "now"), distance in km,
+  passengers (1–8), car / bike availability and a priority selector.
+- Client-side validation that mirrors the API rules, with an error summary and per-field
+  messages. Backend 422 errors are mapped back to the corresponding fields.
+- Results: the backend recommendation with its reasoning and warnings, one card per transport
+  mode (time, cost, CO₂ in total and per passenger, rank, availability, data source,
+  assumptions), the next direct departures from the timetable and current weather.
+- Changing only the priority re-runs the comparison for the same saved trip (`?priority=`),
+  so no duplicate trips are created.
+- Loading, empty, offline and error states with recovery hints. Responsive layout for
+  phone, tablet and desktop. Keyboard support and `prefers-reduced-motion` are respected.
+- The UI never computes its own recommendation and contains no demo data. Everything shown
+  comes from the API.
 
-- Windows 10/11 z Windows PowerShell 5.1 lub PowerShell 7+
-- **Python 3.12.x** (`pyproject.toml` wymaga `>=3.12,<3.13`), instalator z
-  [python.org](https://www.python.org/downloads/). Skrypt szuka go przez launcher `py -3.12`
-  albo `python` w `PATH`.
-- Git
-- **Node.js ≥ 22.12** (wymóg Vite 8) z npm, tylko dla frontendu. Testowano na Node 26 i npm 11.
-- Dostęp do internetu przy pierwszej instalacji zależności (PyPI, npm)
+**Backend (REST API)**
 
-Sprawdzenie wersji Pythona:
+- Trip CRUD (`/api/v1/trips`) with pagination, case-insensitive search (Polish characters
+  included), full (`PUT`) and partial (`PATCH`) updates, and validation: distance in (0, 1000] km,
+  1–8 passengers, origin ≠ destination, unknown fields rejected.
+- Comparison and recommendation (`GET /api/v1/trips/{id}/compare`) with an explanation,
+  the scoring method and a deterministic tie-break.
+- GTFS Static importer (CLI), stop search (`GET /api/v1/stops`) and direct connections
+  honouring the service calendar (`GET /api/v1/connections`).
+- Optional Weatherbit current-weather adjustment with caching and a safe fallback.
+- Health check with a database probe, a consistent error format
+  `{"detail": ..., "code": "not_found" | "validation_error" | "gtfs_not_imported"}`, and CORS
+  configured for the Vite dev server.
 
-```powershell
-py -3.12 --version
+## What is real data and what is estimated
+
+| Value | Source | Real or estimated? |
+|---|---|---|
+| Public transport time with a direct connection found | GTFS Static timetable of ZTM Gdańsk (`data_source: "gtfs_schedule"`) | **Scheduled** time from the official timetable: waiting from the chosen departure time plus ride time. No delays, no walking to and from stops. |
+| Public transport time without a direct connection | Parametric model (`data_source: "parametric_estimate"`) | **Estimate.** The UI shows "estimated time — no confirmed GTFS trip". Transfers are not searched, so this does **not** mean that no connection exists. |
+| Departures list | GTFS Static (`GET /connections`) | Scheduled departures, direct trips only, no real-time data. |
+| Car and bike times | Parametric model | **Estimate**: distance ÷ average speed + fixed overheads. |
+| Costs (fuel, tickets) | Configured parameters | **Estimate.** The ticket tariff is an example, not the official ZTM tariff. |
+| CO₂ | Configured emission factors | **Estimate.** |
+| Distance | Entered by the user | User input. The form shows the straight-line distance between the stops only as a hint. |
+| Weather | Weatherbit Current Weather API | **Current observation**, never a forecast (`is_forecast: false`). Used only for departures within about 2 hours. |
+
+## Architecture
+
+```
+┌──────────────────────────┐      /api (Vite dev proxy)      ┌───────────────────────────────┐
+│ React + TypeScript SPA   │  ─────────────────────────────▶ │ FastAPI  (/api/v1)            │
+│ hooks → services (fetch) │                                 │ api → services → repositories │
+└──────────────────────────┘                                 └──────┬──────────────┬─────────┘
+                                                                    │              │
+                                            ┌───────────────────────┘              └──────────────┐
+                                            ▼                                                     ▼
+                              SQLite  smartroute.db (trips)               SQLite  gtfs.db (timetable, read-only at runtime)
+                                                                          ▲            filled by the GTFS import CLI
+                              Weatherbit Current Weather API ◀── optional, cached, only for "now" trips
 ```
 
-## Szybki start (Windows)
+- **Layers:** `api → services → repositories → models`. Transport calculators, the
+  recommendation engine and the weather rules are plain Python, independent of FastAPI and the
+  database, so they are unit-tested in isolation.
+- **Pluggable transit time:** `PublicTransportCalculator` takes a `TransitTimeProvider`. The
+  GTFS provider returns the scheduled time, or falls back to the parametric estimate and records
+  the reason in `assumptions`.
+- **Two databases:** trips live in `smartroute.db`. The timetable lives in `gtfs.db`, which only
+  the importer writes. The API never downloads data while serving a request.
+- **Frontend flow:** `POST /trips` → `GET /trips/{id}/compare`, with `GET /connections` in
+  parallel for the departures panel. TypeScript types in `frontend/src/types/api.ts` mirror the
+  Pydantic schemas.
+
+## Tech stack
+
+| Area | Technologies |
+|---|---|
+| Backend | Python 3.12, FastAPI, Uvicorn, SQLAlchemy 2.0, Pydantic v2, pydantic-settings |
+| Database | SQLite (WAL mode for the timetable database) |
+| Timetable | GTFS Static, parsed with the standard library (`csv`, `zipfile`, `zoneinfo` + `tzdata`) |
+| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, Lucide React |
+| Tests | pytest, pytest-cov, httpx/TestClient; Vitest, Testing Library, jsdom |
+| Code quality | Ruff (lint + format); ESLint (typescript-eslint, react-hooks); `tsc` typecheck |
+
+Backend dependencies are declared in [`backend/pyproject.toml`](backend/pyproject.toml).
+Verified, pinned versions are in [`backend/requirements-lock.txt`](backend/requirements-lock.txt),
+which `setup.ps1` applies as a constraints file. Frontend versions are pinned in
+`frontend/package-lock.json`.
+
+## Getting started
+
+### Requirements
+
+- **Python 3.12.x** (`pyproject.toml` requires `>=3.12,<3.13`)
+- **Node.js ≥ 22.12** with npm (required by Vite 8), for the frontend only
+- Git and internet access for the first installation (PyPI, npm) and the GTFS download
+
+The helper scripts target **Windows PowerShell 5.1 or PowerShell 7+**. The
+[manual commands](#manual-setup-macos--linux--without-scripts) work on any OS, but only Windows
+has been tested.
+
+### Quick start (Windows)
 
 ```powershell
-git clone <URL-repozytorium> smartroute-ai
+git clone <repository-url> smartroute-ai
 cd smartroute-ai
+
+# 1. Backend environment: creates .venv, installs pinned dependencies, copies backend/.env.example to backend/.env
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
-powershell -ExecutionPolicy Bypass -File .\import-gtfs.ps1   # opcjonalnie: rozkład ZTM (~30 s)
+
+# 2. Timetable (needed for stop search in the UI): downloads the ZTM Gdańsk feed (~30 s, ~125 MB database)
+powershell -ExecutionPolicy Bypass -File .\import-gtfs.ps1
+
+# 3. Backend: http://127.0.0.1:8000 (Swagger UI at /docs)
 powershell -ExecutionPolicy Bypass -File .\run.ps1
 ```
 
-Następnie otwórz Swagger UI: **http://127.0.0.1:8000/docs**. Frontend uruchamia się w drugim
-terminalu ([instrukcja](#frontend-react--typescript)):
+In a second terminal:
 
 ```powershell
 cd frontend
@@ -115,816 +167,373 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-Bez importu rozkładu aplikacja działa jak wcześniej. `/stops` i `/connections` zwracają wtedy
-`503 gtfs_not_imported`, a porównanie używa szacunku parametrycznego.
+Open **http://localhost:5173**. The Vite dev server proxies `/api` to `http://127.0.0.1:8000`,
+so the browser only sees one origin.
 
-> **Execution Policy:** domyślnie Windows blokuje uruchamianie skryptów `.ps1`. Flaga
-> `-ExecutionPolicy Bypass` działa tylko dla tego jednego wywołania i niczego nie zmienia na
-> stałe. Jeśli wolisz uruchamiać skrypty bezpośrednio (`.\setup.ps1`), zmień politykę dla
-> swojego użytkownika: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+> `-ExecutionPolicy Bypass` applies to that single call only. To run the scripts directly
+> (`.\setup.ps1`), allow local scripts for your user:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-### Co robi `setup.ps1`
-
-1. Tworzy `.venv` w katalogu głównym repozytorium z Pythona 3.12, jeśli `.venv` jeszcze nie ma.
-   Jeśli istniejące `.venv` ma inną wersję Pythona, skrypt kończy się błędem i niczego nie usuwa.
-2. Instaluje backend w trybie edytowalnym z dodatkami dev:
-   `pip install -e "backend[dev]" -c backend/requirements-lock.txt`, a potem uruchamia `pip check`.
-3. Kopiuje `backend/.env.example` do `backend/.env`, jeśli `backend/.env` nie istnieje.
-   Istniejący plik zostaje bez zmian.
-
-Skrypt można bezpiecznie uruchamiać wielokrotnie. Opcja `-NoDev` instaluje tylko zależności
-potrzebne do uruchomienia aplikacji.
-
-<details>
-<summary>Instalacja ręczna (bez skryptu)</summary>
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]" -c .\backend\requirements-lock.txt
-Copy-Item .\backend\.env.example .\backend\.env
-```
-
-</details>
-
-## Uruchomienie backendu
-
-```powershell
-.\run.ps1                       # http://127.0.0.1:8000, z auto-reload
-.\run.ps1 -Port 8080            # inny port
-.\run.ps1 -NoReload             # bez auto-reload
-.\run.ps1 -BindHost 0.0.0.0     # dostęp z sieci lokalnej
-```
-
-`run.ps1` używa interpretera z `.venv` i uruchamia Uvicorn **z katalogu `backend/`**, niezależnie
-od tego, skąd wywołano skrypt. Ma to znaczenie, bo z tego katalogu wczytywany jest `.env`
-i względem niego liczona jest ścieżka do bazy SQLite.
-
-Odpowiednik ręczny:
-
-```powershell
-cd backend
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
-
-| Adres                                  | Opis                   |
-|----------------------------------------|------------------------|
-| http://127.0.0.1:8000/docs             | Swagger UI             |
-| http://127.0.0.1:8000/redoc            | ReDoc                  |
-| http://127.0.0.1:8000/openapi.json     | Specyfikacja OpenAPI   |
-| http://127.0.0.1:8000/api/v1/health    | Health check           |
-
-## Frontend (React + TypeScript)
-
-Jednostronicowy dashboard w katalogu [`frontend/`](frontend). Wszystkie dane pochodzą z API
-backendu: frontend nie liczy własnych rekomendacji, nie ma danych demonstracyjnych i nie łączy
-się z Weatherbit (klucz zostaje w `backend/.env`).
-
-### Uruchomienie
-
-Wymaga działającego backendu (`.\run.ps1`). Wyszukiwarka przystanków potrzebuje zaimportowanego
-rozkładu (`.\import-gtfs.ps1`).
-
-```powershell
-cd frontend
-npm install          # pierwsza instalacja (wersje przypięte w package-lock.json)
-npm run dev          # dev server: http://localhost:5173
-```
-
-| Polecenie           | Opis                                                     |
-|---------------------|----------------------------------------------------------|
-| `npm run dev`       | serwer deweloperski Vite z proxy `/api` → backend        |
-| `npm run build`     | kontrola typów (`tsc -b`) + build produkcyjny do `dist/` |
-| `npm run preview`   | podgląd buildu produkcyjnego (port 4173, także z proxy)  |
-| `npm run typecheck` | sama kontrola TypeScript                                 |
-| `npm run lint`      | ESLint                                                   |
-| `npm test`          | testy Vitest (jsdom, bez sieci i bez backendu)           |
-
-### Komunikacja z backendem
-
-- Frontend wysyła żądania na względny adres `/api/v1`. Dev server Vite
-  ([`vite.config.ts`](frontend/vite.config.ts)) przekazuje `/api` do `http://127.0.0.1:8000`,
-  więc przeglądarka widzi jeden origin i CORS nie jest potrzebny.
-- Inny adres backendu dla proxy ustawisz zmienną `VITE_BACKEND_PROXY_TARGET` w
-  `frontend/.env.local` (wzór: [`frontend/.env.example`](frontend/.env.example)).
-- Bez proxy, np. przy statycznym hostingu `dist/`, ustaw `VITE_API_BASE_URL`
-  (np. `http://127.0.0.1:8000/api/v1`) i dodaj origin frontendu do `CORS_ORIGINS` w
-  `backend/.env`. Domyślnie backend dopuszcza `http://localhost:5173`.
-
-Przepływ porównania ([`useComparison.ts`](frontend/src/hooks/useComparison.ts)):
-
-1. `GET /stops?query=…`: podpowiedzi przystanków (opóźnienie 250 ms, anulowanie nieaktualnych
-   żądań).
-2. `POST /trips`: zapis podróży z `origin_stop_id`, `destination_stop_id` i `departure_at`
-   (czas lokalny Gdańska bez strefy). Jako `origin` i `destination` trafiają nazwy przystanków.
-3. `GET /trips/{id}/compare` oraz równolegle `GET /connections` (okno 180 min, zgodne
-   z `GTFS_SEARCH_WINDOW_MIN`). Odpowiedź `/compare` zawiera tylko najlepszy kurs w
-   `assumptions`, więc listę odjazdów pobieramy osobno.
-4. Zmiana samego priorytetu, przy niezmienionych pozostałych danych, nie tworzy nowej podróży.
-   Używa wtedy parametru `?priority=` na tej samej podróży.
-
-Typy w [`src/types/api.ts`](frontend/src/types/api.ts) odwzorowują schematy Pydantic
-z `backend/app/schemas`. Błędy `{detail, code}` są zamieniane na komunikaty po polsku
-([`utils/errors.ts`](frontend/src/utils/errors.ts)), a błędy 422 trafiają do konkretnych pól.
-
-### Układ i decyzje UX
-
-Ekran czyta się od góry do dołu: planer podróży, potem wyniki, a na końcu pomoc.
-
-- **Planer na pełnej szerokości zamiast wąskiej kolumny.** Formularz jest kompaktowym, poziomym
-  panelem (kontener do 1440 px). Na desktopie mieści się w 2–3 wierszach: trasa i termin, potem
-  dystans i priorytet, potem pasek opcji z przyciskiem „Porównaj”. Wyniki zajmują całą szerokość
-  pod formularzem, więc nie zostaje pusta kolumna. Przycisk nie jest przyklejony (sticky), więc
-  niczego nie zasłania na małych ekranach.
-- **Najważniejsze pola widoczne, drugorzędne zwinięte.** Przystanki, termin, dystans i priorytet
-  są zawsze widoczne. Pasażerowie i dostępność samochodu i roweru tworzą kompaktowy pasek.
-  Nazwa podróży jest w sekcji „Opcje zaawansowane”, która otwiera się sama, gdy pole ma błąd.
-- **Mniej stałego drobnego tekstu.** Dłuższe wyjaśnienia przeniesiono do dymków `InfoTip`
-  (hover, focus klawiatury, dotyk, Escape; treść podpięta przez `aria-describedby`) i do
-  rozwijanych sekcji. Informacja, że dystans jest szacunkowy, zostaje w etykiecie pola.
-- **Karty wariantów z metrykami w wierszach.** Etykieta „Czas / Koszt / CO₂” stoi po lewej,
-  a duża wartość liczbowa po prawej. Wartości w kolejnych kartach leżą na tej samej wysokości,
-  więc łatwo je porównać. Siatka ma 3 kolumny dopiero od `xl` (≥ 1280 px), 2 + 1 na tabletach
-  (ostatnia karta na pełną szerokość) i 1 kolumnę na telefonie. Gdy karta jest szeroka (container
-  query `@md`), metryki układają się w 3 kolumny. Miejsce w rankingu to krótki tekst
-  („Miejsce 2 z 3”), a rekomendowany wariant ma etykietę „Rekomendowany”, nie tylko kolor.
-- **Kompaktowa rekomendacja.** Panel pokazuje nazwę wariantu, priorytet, pierwsze zdanie
-  uzasadnienia z backendu, korzyści wynikające z danych (np. „Najniższy koszt”) i trzy kluczowe
-  liczby. Pełne uzasadnienie i opis metody są w sekcji rozwijanej. Ostrzeżenia (pogoda,
-  pominięte warianty, remis, komunikacja rekomendowana bez potwierdzonego kursu GTFS) są zawsze
-  widoczne.
-- **Remisy.** Oznaczenia „najkrótszy / najniższy” porównują wartości tak, jak są wyświetlane
-  (np. 13,2 i 13,4 min to dwa razy „13 min”). Gdy kilka wariantów ma tę samą najlepszą wartość,
-  każdy dostaje oznaczenie „ex aequo”. Wybór jednej rekomendacji zawsze należy do backendu:
-  przy remisie metryki głównej decyduje kolejna metryka (fastest: czas → koszt → CO₂ itd.),
-  a uzasadnienie mówi to wprost. Pełny remis rozstrzyga stała kolejność rower → komunikacja
-  miejska → samochód (`scoring.tie_break_order`).
-- **Pomoc pod aplikacją.** Sekcja „Jak to działa?” to zwinięte akordeony pod wynikami, a stan
-  początkowy to jedna krótka zachęta bez fikcyjnych wyników.
-- **Szybka korekta.** Pasek podsumowania nad wynikami pozwala zmienić priorytet jednym kliknięciem
-  i ma przycisk „Edytuj”, który przewija do formularza i ustawia focus na pierwszym polu.
-
-### Prezentacja danych GTFS i szacunków
-
-Czas komunikacji miejskiej i lista odjazdów to dwie różne informacje, prezentowane osobno:
-
-| Sytuacja | Karta „Komunikacja miejska” | Panel „Odjazdy z rozkładu” |
-|----------|-----------------------------|----------------------------|
-| Backend użył rozkładu (`data_source: gtfs_schedule`) | „Czas z rozkładu GTFS” + linia, kierunek i godzina odjazdu | lista kursów, użyty kurs oznaczony „użyty w porównaniu” |
-| Szacunek, a rozkład nie ma kursu bezpośredniego w oknie 180 min | etykieta czasu „Czas (szac.)” i ostrzeżenie **„Czas szacunkowy — brak potwierdzonego kursu GTFS”** | „Brak kursu bezpośredniego w rozkładzie”, informacja, że **nie oznacza to braku połączenia z przesiadką**, sugestie i przycisk „Zmień przystanki lub godzinę” |
-| Szacunek, a rozkładu nie udało się pobrać | „Czas szacunkowy — nie sprawdzono rozkładu” | komunikat błędu z instrukcją |
-
-- Wariant komunikacji zostaje w porównaniu zawsze wtedy, gdy zwraca go backend. Frontend
-  niczego nie przelicza i nie zmienia rankingu.
-- Kurs z panelu jest oznaczany jako użyty tylko po jednoznacznym dopasowaniu linii i godziny
-  odjazdu do założeń backendu ([`utils/transit.ts`](frontend/src/utils/transit.ts)). Karta
-  i panel korzystają z tego samego wyniku, więc nie mogą sobie przeczyć.
-- Odjazdy mają etykietę „GTFS Static · bez opóźnień”. Nie pokazujemy fikcyjnych opóźnień ani
-  danych w czasie rzeczywistym.
-
-### Najważniejsze funkcje
-
-- Wyszukiwarka przystanków GTFS jako dostępny combobox (strzałki, Enter, Escape). Po wyborze
-  widoczna jest nazwa i numer słupka. Dostępne są przyciski „Zmień” i „Zamień kierunek”,
-  a przystanku wybranego w drugim polu nie da się wybrać ponownie.
-- Data i godzina ustawiają się domyślnie na „teraz” w strefie Europe/Warsaw. Jest przycisk
-  „Ustaw teraz” i ostrzeżenie o terminie w przeszłości.
-- **Dystans szacunkowy w km** wpisuje użytkownik. Jako punkt odniesienia formularz pokazuje
-  odległość w linii prostej między przystankami z dopiskiem „trasa będzie dłuższa”. Aplikacja
-  nie wyznacza trasy drogowej.
-- Pasażerowie (1–8), priorytet w formie segmentów z opisem wybranej opcji, przełączniki
-  samochodu i roweru, opcjonalna nazwa (domyślnie „Start → Cel”).
-- Karty wariantów pokazują czas, koszt i CO₂ (łącznie i na osobę), miejsce w rankingu,
-  dostępność z powodem, pochodzenie danych, komfort pogodowy oraz rozwijane założenia.
-- Panel pogody pokazuje temperaturę, wiatr, opady, śnieg i wpływ na rower, z etykietą „aktualne
-  warunki, nie prognoza”. Gdy danych brak, wyświetla neutralny komunikat.
-- Wskaźnik stanu backendu i komunikat z instrukcją, gdy backend nie działa.
-
-### Heurystyki Nielsena w interfejsie
-
-| # | Heurystyka | Zastosowanie | Komponenty |
-|---|------------|--------------|------------|
-| 1 | Widoczność stanu systemu | Spinner w wyszukiwarce i na przycisku („Zapisywanie podróży…”, „Obliczanie porównania…”), szkielet wyników, przyciemnienie przy przeliczaniu, status backendu w nagłówku, komunikaty `aria-live`, blokada ponownego wysłania, przycisk „Porównaj ponownie” po pierwszym wyniku | `StopPicker`, `TripForm`, `DashboardPage`, `Header` |
-| 2 | Zgodność ze światem rzeczywistym | Polskie etykiety, `Intl` pl-PL (`2,50 zł`, `0,94 kg`, `1 h 5 min`), godziny w czasie Gdańska, nazwy przystanków zamiast `stop_id`, „tramwaj/autobus” zamiast `route_type`, „za 5 min” zamiast surowego czasu oczekiwania | `utils/format.ts`, `VariantCard`, `SchedulePanel` |
-| 3 | Kontrola i swoboda | Formularz zawsze nad wynikami, „Edytuj” w pasku podsumowania, „Zmień przystanki lub godzinę” przy braku kursu, „Zmień” i „Zamień kierunek”, szybka zmiana priorytetu, dane zachowane po błędzie, „Spróbuj ponownie” | `TripForm`, `ResultsSection`, `SchedulePanel`, `StopPicker` |
-| 4 | Spójność i standardy | Wspólne klasy `card`/`btn`/`input`/`badge`, ten sam selektor priorytetu w formularzu i nad wynikami, ten sam układ metryk w każdej karcie, stałe kolory i ikony środków transportu, etykiety pól zgodne z podsumowaniem błędów | `index.css`, `PrioritySelector`, `VariantCard`, `ModeIcon` |
-| 5 | Zapobieganie błędom | Walidacja przed wysłaniem (przystanki, różne przystanki, dystans > 0 i ≤ 1000, 1–8 pasażerów, poprawna data i godzina), blokada wyboru tego samego przystanku, przyciski +/−, wybór przystanku tylko z listy, `maxLength` nazwy | `utils/tripForm.ts`, `StopPicker`, `TripForm` |
-| 6 | Rozpoznawanie zamiast przypominania | Podpowiedzi przystanków bez polskich znaków, nazwa i słupek wybranego przystanku, stały opis wybranego priorytetu, korzyści rekomendacji nazwane wprost, użyty kurs oznaczony w rozkładzie | `StopPicker`, `PrioritySelector`, `RecommendationPanel`, `SchedulePanel` |
-| 7 | Elastyczność i efektywność | Kompaktowy planer (mniej przewijania), domyślnie „teraz”, 1 pasażer i „zrównoważony”, automatyczna nazwa, „Wstaw” dystans w linii prostej jako punkt wyjścia, zmiana priorytetu bez tworzenia nowej podróży, automatyczne przewinięcie do wyników | `TripForm`, `useComparison`, `ResultsSection`, `DashboardPage` |
-| 8 | Estetyka i minimalizm | Hierarchia: podsumowanie → rekomendacja → karty → rozkład i pogoda → objaśnienia. Lead zamiast pełnego uzasadnienia, szczegóły w dymkach i sekcjach rozwijanych, mniej ramek w ramkach | `RecommendationPanel`, `VariantCard`, `ui/InfoTip`, `HelpPanel` |
-| 9 | Rozpoznawanie i naprawa błędów | Komunikaty zamiast kodów HTTP, z krokami naprawy (`run.ps1`, `import-gtfs.ps1`), błędy 422 przy polach, podsumowanie błędów z linkami, przy braku kursu GTFS: wyjaśnienie (inny słupek, godzina, przesiadki nieobsługiwane) i przycisk powrotu do formularza | `utils/errors.ts`, `TripForm`, `SchedulePanel`, `DashboardPage` |
-| 10 | Pomoc i dokumentacja | Akordeony „Jak to działa?” pod aplikacją (metoda, szacunki, GTFS, Weatherbit, ograniczenia), dymki przy dystansie, przełącznikach, rozkładzie i pogodzie, metoda przy rekomendacji | `HelpPanel`, `ui/InfoTip`, `RecommendationPanel` |
-
-Dostępność: semantyczne sekcje i nagłówki, etykiety pól, `aria-invalid` i `aria-describedby`
-dla błędów, `role="alert"` dla błędów wymagających reakcji, widoczny focus, link „Przejdź do
-formularza”, natywne radio i checkbox (`role="switch"`), cele klikalne o wysokości co najmniej
-40 px, obsługa `prefers-reduced-motion`. Wyłączony środek transportu jest przekreślony,
-a nie tylko wyszarzony. Układ docelowo obsługuje szerokości 360, 768, 1024 i 1440 px; patrz
-[ręczna weryfikacja](#ręczna-weryfikacja-układu).
-
-### Ręczna weryfikacja układu
-
-Testy automatyczne (jsdom) nie sprawdzają wyglądu. Przed prezentacją warto w DevTools
-(tryb urządzenia) sprawdzić szerokości 360, 768, 1024 i 1440 px:
-
-1. Brak poziomego paska przewijania. Pola daty i godziny oraz pasek opcji mieszczą się w kadrze.
-2. Planer: na 1440 px ma 3 wiersze, a przycisk „Porównaj” jest po prawej. Na 360 px pola
-   są w jednej kolumnie, a przycisk na pełną szerokość.
-3. Karty: 3 w rzędzie na 1440 px, 2 + 1 na 768 i 1024 px, jedna kolumna na 360 px. Nazwy
-   i wartości nie łamią się.
-4. Trasa bez kursu bezpośredniego (np. **Dworzec Główny 02 → Zaspa 01**): karta komunikacji
-   pokazuje „Czas szacunkowy — brak potwierdzonego kursu GTFS”, a panel pokazuje wyjaśnienie
-   i przycisk „Zmień przystanki lub godzinę”.
-5. Trasa z kursem (np. **Dworzec Główny 01 → Zaspa 01**): karta pokazuje „Czas z rozkładu GTFS”,
-   a w panelu jeden kurs ma oznaczenie „użyty w porównaniu”.
-6. Nawigacja wyłącznie klawiaturą: Tab, strzałki w liście przystanków i w priorytecie, Escape
-   zamyka dymek.
-
-### Struktura
-
-```
-frontend/
-├── index.html  vite.config.ts  eslint.config.js  tsconfig*.json  .env.example
-└── src/
-    ├── main.tsx  App.tsx  index.css   # punkt wejścia, motyw Tailwind (@theme)
-    ├── pages/DashboardPage.tsx        # układ i orkiestracja przepływu
-    ├── components/                    # TripForm, StopPicker, PrioritySelector, ResultsSection,
-    │   │                              # VariantCard, RecommendationPanel, SchedulePanel,
-    │   │                              # WeatherPanel, HelpPanel, Header, EmptyState, ModeIcon
-    │   └── ui/                        # Alert, Spinner, InfoTip
-    ├── hooks/                         # useComparison, useStopSearch, useBackendHealth
-    ├── services/                      # apiClient (fetch + ApiError), smartrouteApi (endpointy)
-    ├── types/api.ts                   # typy kontraktu API
-    ├── utils/                         # formatowanie, data/czas, walidacja, błędy, etykiety,
-    │                                  # wyniki, status GTFS (transit.ts)
-    └── test/setup.ts
-```
-
-## Konfiguracja
-
-Konfiguracja jest oparta na `pydantic-settings` ([`backend/app/core/config.py`](backend/app/core/config.py)).
-Każda wartość ma rozsądny domyślny odpowiednik, więc plik `.env` **nie jest wymagany**. Wartości
-można nadpisać plikiem `backend/.env` albo zmiennymi środowiskowymi, przy czym zmienne środowiskowe
-mają pierwszeństwo.
-
-| Zmienna         | Domyślnie                    | Opis                                       |
-|-----------------|------------------------------|--------------------------------------------|
-| `APP_NAME`      | `SmartRoute AI`              | Nazwa w Swagger UI i health check          |
-| `ENVIRONMENT`   | `development`                | `development` / `test` / `production`      |
-| `DEBUG`         | `false`                      | Tryb debug FastAPI i logowanie SQL         |
-| `DATABASE_URL`  | `sqlite:///./smartroute.db`  | URL bazy; ścieżka względna liczona od `backend/` |
-| `CORS_ORIGINS`  | `http://localhost:5173`      | Lista originów rozdzielona przecinkami     |
-| `TRANSPORT__*`  | zob. `transport_params.py`   | Parametry modelu, np. `TRANSPORT__CAR__FUEL_PRICE_PLN_PER_L=6.89` |
-| `GTFS_DATABASE_URL` | `sqlite:///./gtfs.db`    | Osobna baza rozkładu (tworzy ją importer)  |
-| `GTFS_FEED_URL` | oficjalny feed ZTM Gdańsk    | Domyślne źródło importu                    |
-| `GTFS_SEARCH_WINDOW_MIN` | `180`               | Okno szukania połączenia przy porównaniu [min] |
-| `GTFS_MAX_DOWNLOAD_MB` | `200`                 | Limit rozmiaru pobieranego ZIP-a           |
-| `WEATHERBIT_API_KEY` | brak (wyłączone)       | Klucz Weatherbit — tylko w `.env` / env    |
-| `WEATHER_TIMEOUT_S` | `5`                     | Timeout zapytania HTTP [s]                 |
-| `WEATHER_CACHE_TTL_S` | `1800`                | Cache odczytu na lokalizację [s]           |
-| `WEATHER_ERROR_COOLDOWN_S` | `300`            | Przerwa w zapytaniach po błędzie / 429 [s] |
-| `WEATHER_MAX_LEAD_MIN` | `120`                | Maks. czas do odjazdu, by użyć pogody [min] |
-
-Pełna lista parametrów modelu z jednostkami jest w [`backend/.env.example`](backend/.env.example)
-i [`backend/app/core/transport_params.py`](backend/app/core/transport_params.py).
-
-## Baza danych
-
-- SQLite. Są dwa pliki, oba ignorowane przez Git:
-  - `backend/smartroute.db`: podróże; tworzy go aplikacja,
-  - `backend/gtfs.db`: rozkład; tworzy go wyłącznie importer, około 125 MB dla feedu ZTM.
-- **Nie trzeba wykonywać żadnych ręcznych kroków.** Przy starcie aplikacja wywołuje
-  `Base.metadata.create_all()`, które tworzy brakujące tabele (obecnie `trips`), a następnie
-  `upgrade_schema()` ([`app/db/migrations.py`](backend/app/db/migrations.py)).
-- **Migracja z wcześniejszej wersji:** `upgrade_schema()` dodaje do istniejącej tabeli `trips`
-  kolumny `origin_stop_id`, `destination_stop_id` i `departure_at` (`ALTER TABLE ... ADD COLUMN`,
-  wszystkie nullable). Operacja jest idempotentna i nie zmienia istniejących wierszy, a stare
-  podróże dostają w nowych polach `null`.
-- Pełne migracje (Alembic) są poza zakresem MVP. Przy innych zmianach modelu na etapie
-  developmentu usuń `backend/smartroute.db` (to usunie zapisane podróże).
-- Reset bazy podróży: zatrzymaj serwer i wykonaj `Remove-Item .\backend\smartroute.db`.
-
-## Rozkład GTFS (ZTM Gdańsk)
-
-Źródło: [Otwarte Dane Gdańsk, GTFS Static ZTM](https://ckan.multimediagdansk.pl/dataset/c24aa637-3619-4dc2-a171-a23eec8f2172/resource/30e783e4-2bec-4a7d-bb22-ee3e3b26ca96/download/gtfsgoogle.zip).
-Aplikacja **nigdy nie pobiera danych w trakcie obsługi żądania**. Rozkład trafia do lokalnej bazy
-SQLite tylko przez importer.
-
-### Import i odświeżanie
-
-```powershell
-.\import-gtfs.ps1                                   # pobierz oficjalny feed i zaimportuj
-.\import-gtfs.ps1 -Source C:\dane\gtfsgoogle.zip    # import z lokalnego pliku
-
-# to samo bez wrappera:
-cd backend
-..\.venv\Scripts\python.exe -m app.cli.gtfs import
-..\.venv\Scripts\python.exe -m app.cli.gtfs import --source C:\dane\gtfsgoogle.zip
-..\.venv\Scripts\python.exe -m app.cli.gtfs info    # źródło, data importu, ważność, liczby rekordów
-```
-
-- **Odświeżanie:** ZTM publikuje feed codziennie, a każda wersja obejmuje około 15 dni.
-  Uruchamiaj import regularnie, np. raz dziennie z Harmonogramu zadań Windows.
-  `GET /connections` zwraca `feed.valid_from` i `feed.valid_to`, a dla daty spoza tego zakresu
-  dodaje uwagę w `notes`.
-- **Ponowny import** zastępuje cały rozkład w jednej transakcji. Przy błędzie (uszkodzony ZIP,
-  brak wymaganego pliku lub kolumny) poprzedni rozkład zostaje nietknięty. Baza działa w trybie
-  WAL, więc działający serwer może czytać stare dane w trakcie importu i nie trzeba go zatrzymywać.
-- **Pamięć i bezpieczeństwo:** pliki CSV są czytane strumieniowo z ZIP-a i wstawiane partiami.
-  Szczyt pamięci przy pełnym feedzie to około 50 MB. Importer niczego nie rozpakowuje na dysk
-  i czyta tylko znane pliki z katalogu głównego archiwum. Odrzuca pliki zaszyfrowane, większe
-  niż 1 GiB po rozpakowaniu i o podejrzanym współczynniku kompresji. Pobieranie ma limit
-  `GTFS_MAX_DOWNLOAD_MB` i timeout.
-- **Wadliwe wiersze** (zły format czasu, nieznany kurs lub przystanek, zła data) są pomijane.
-  Ich liczbę i pierwsze przykłady pokazuje raport importu.
-
-### Zweryfikowana struktura feedu ZTM (pobranego 11.11.2026)
-
-| Plik | Wiersze | Uwagi |
-|---|---:|---|
-| `agency.txt` | 1 | `agency_timezone=Europe/Warsaw` |
-| `feed_info.txt` | 1 | `feed_start_date` puste, `feed_end_date=20261125` |
-| `calendar.txt` | — | **brak pliku**; kalendarz wyłącznie w `calendar_dates.txt` |
-| `calendar_dates.txt` | 60 | tylko `exception_type=1`, 11–25.11.2026 |
-| `routes.txt` | 93 | `route_type` rozszerzony: 700 (autobus), 900 (tramwaj) |
-| `stops.txt` | 1 625 | słupki (np. „Dworzec Główny 01”), bez stacji nadrzędnych |
-| `trips.txt` | 92 600 | `direction_id` 0/1, `trip_headsign` |
-| `stop_times.txt` | 2 212 094 | czasy do `29:25:00`, `pickup_type`/`drop_off_type` ∈ {0, 1, 3} |
-| `shapes.txt` | — | nieimportowany (niepotrzebny do wyznaczania czasu) |
-
-Pliki są w UTF-8 bez BOM, z końcami linii CRLF. Importer akceptuje też `calendar.txt`,
-`exception_type=2` i plik z BOM.
-
-### Jak liczone są połączenia
-
-- **Tylko połączenia bezpośrednie.** Kurs musi zatrzymać się na przystanku startowym, a potem,
-  z wyższym `stop_sequence`, na docelowym. Kurs w przeciwnym kierunku nie zostanie zwrócony.
-- Pomijane są postoje z `pickup_type=1` na starcie i `drop_off_type=1` na celu. Wartość `3`
-  (ZTM używa jej dla przystanków na żądanie) jest traktowana jako dostępna.
-- **Kalendarz:** kurs liczy się tylko w dniu, w którym jego `service_id` kursuje.
-- **Czasy ≥ 24:00 i strefa czasowa:** czasy GTFS są liczone od „południa minus 12 h” dnia
-  kursowania w `agency_timezone` (Europe/Warsaw), co poprawnie obsługuje zmianę czasu.
-  Kurs z kalendarza 12.11 o `24:20:00` przyjeżdża 13.11 o 00:20. Wyszukiwanie po północy
-  uwzględnia też kursy z poprzedniego dnia kursowania (`service_date` w odpowiedzi).
-- `departure_at` bez strefy jest interpretowane jako czas lokalny Europe/Warsaw. Odpowiedzi
-  zawierają przesunięcie, np. `+01:00`.
-
-### Integracja z porównaniem
-
-Podróż może mieć opcjonalne `origin_stop_id`, `destination_stop_id` (wartości `stop_id`
-z `GET /stops`) i `departure_at`. Tekstowe `origin`/`destination` nigdy nie są zamieniane
-na przystanek. Wariant „Komunikacja miejska” w `GET /trips/{id}/compare`:
-
-- **`data_source: "gtfs_schedule"`**, gdy istnieje bezpośrednie połączenie w ciągu
-  `GTFS_SEARCH_WINDOW_MIN` (180 min) od `departure_at`. Czas to oczekiwanie od `departure_at`
-  do odjazdu plus przejazd, bez dojścia do przystanków. Linia, odjazd i przyjazd są opisane
-  w `assumptions`.
-- **`data_source: "parametric_estimate"`** w każdym innym przypadku. Gdy podano któreś z pól
-  GTFS, pierwsza pozycja `assumptions` wyjaśnia powód: brak połączenia, nieznany przystanek,
-  brakujące pole albo nie zaimportowany rozkład.
-- Podróże bez pól GTFS są liczone dokładnie tak jak wcześniej. Koszt biletu i CO₂ zawsze
-  pochodzą z parametrów modelu.
-
-## Pogoda bieżąca (Weatherbit)
-
-Opcjonalna korekta wariantu „Rower” na podstawie **bieżącej** pogody z
-[Weatherbit Current Weather API](https://www.weatherbit.io/api/weather-current)
-(`GET /v2.0/current`, darmowy plan). Prognozy i płatne funkcje nie są używane.
-
-### Konfiguracja
-
-1. Załóż konto na weatherbit.io i skopiuj klucz API (aktywacja nowego klucza może chwilę potrwać,
-   do tego czasu API odpowiada błędem 401/403).
-2. Wpisz go **wyłącznie** w `backend/.env` (plik jest w `.gitignore`) albo w zmiennej
-   środowiskowej:
-
-   ```
-   WEATHERBIT_API_KEY=twoj_klucz
-   ```
-
-3. Uruchom ponownie backend (`.\run.ps1`). Bez klucza integracja jest wyłączona, a porównanie
-   działa jak wcześniej (`weather.status: "disabled"`).
-
-Klucz jest typu `SecretStr` (maskowany w `repr`), nie trafia do logów ani komunikatów błędów,
-a wyjątki HTTP, których URL zawiera klucz, nie są dołączane do tracebacków. Pozostałe ustawienia
-(`WEATHER_TIMEOUT_S`, `WEATHER_CACHE_TTL_S`, `WEATHER_ERROR_COOLDOWN_S`, `WEATHER_MAX_LEAD_MIN`)
-opisuje [Konfiguracja](#konfiguracja).
-
-### Kiedy pogoda jest uwzględniana
-
-Korekta jest stosowana tylko wtedy, gdy spełnione są wszystkie warunki. Inaczej `weather.status`
-podaje powód, a `weather.explanation` go wyjaśnia:
-
-| Warunek | Status przy niespełnieniu |
+| Script | What it does |
 |---|---|
-| Rower jest dostępny dla podróży | `not_applicable` |
-| Ustawiono `WEATHERBIT_API_KEY` | `disabled` |
-| `departure_at` jest od 60 min wstecz do `WEATHER_MAX_LEAD_MIN` (120 min) w przód od teraz | `out_of_time_window` |
-| Podróż ma `origin_stop_id`, a przystanek GTFS ma współrzędne | `no_location` |
-| Weatherbit odpowiedział (z cache lub z API) | `unavailable` |
+| `setup.ps1` | Creates `.venv` from Python 3.12 if it is missing. It stops with an error, and deletes nothing, if an existing `.venv` uses another Python version. Then it runs `pip install -e "backend[dev]" -c backend/requirements-lock.txt` and `pip check`, and copies `.env.example` to `.env` only if `.env` does not exist. It is idempotent. `-NoDev` installs runtime dependencies only. |
+| `import-gtfs.ps1` | Runs `python -m app.cli.gtfs import` from `backend/`. `-Source <url-or-zip>` imports from another URL or a local ZIP. Re-importing replaces the timetable in one transaction. |
+| `run.ps1` | Starts Uvicorn from `backend/`, where `.env` and the relative SQLite paths are resolved. Options: `-Port 8080`, `-BindHost 0.0.0.0`, `-NoReload`. |
 
-- **Lokalizacja** to współrzędne przystanku startowego z rozkładu GTFS. Tekstowe `origin`
-  (np. „Gdańsk”) nigdy nie jest zamieniane na współrzędne.
-- **Pogoda bieżąca to nie prognoza** (`weather.is_forecast: false`). Dla podróży za kilka godzin
-  lub dni korekta jest pomijana.
-- **Błędy nie psują porównania.** Timeout, HTTP 429, odrzucony klucz, brak internetu i niepoprawna
-  odpowiedź dają `status: "unavailable"`, a wynik jest identyczny jak bez pogody.
+Without an imported timetable, the API still works: comparisons use the estimate, and `/stops`
+and `/connections` return `503 gtfs_not_imported`. The UI requires stop selection, though, so
+import the timetable before using the dashboard.
 
-### Limit zapytań
+### Manual setup (macOS / Linux / without scripts)
 
-- Timeout HTTP: 5 s.
-- Cache w pamięci procesu: 30 min na komórkę siatki 0,1° (kilka km). Zapytanie wysyłane jest dla
-  środka komórki, więc wszystkie przystanki w okolicy dzielą jeden odczyt.
-- Po każdym błędzie klient przez 5 min nie odpytuje API (dla żadnej lokalizacji).
-- Gdy rower jest niedostępny, termin jest poza oknem albo brak lokalizacji, zapytanie w ogóle
-  nie jest wysyłane.
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate                  # Windows: .\.venv\Scripts\Activate.ps1
+pip install -e "./backend[dev]" -c backend/requirements-lock.txt
+cp backend/.env.example backend/.env       # optional, every setting has a default
 
-Jednostki: zapytanie zawsze ma `units=M`, czyli temperatura w °C, opad (`precip`, `snow`) w mm/h
-i wiatr (`wind_spd`) w m/s. Wiatr jest przeliczany na km/h (× 3,6).
+cd backend
+python -m app.cli.gtfs import              # optional: timetable
+python -m app.cli.gtfs info                # source, import time, validity, record counts
+python -m uvicorn app.main:app --reload    # http://127.0.0.1:8000
 
-### Heurystyki komfortu roweru
-
-Reguły są deterministyczne ([`app/services/weather/adjustment.py`](backend/app/services/weather/adjustment.py)),
-a progi są przyjętymi założeniami MVP:
-
-| Czynnik | Komfort `reduced` | Komfort `poor` |
-|---|---|---|
-| Opad | ≥ 0,2 mm/h | ≥ 2,5 mm/h |
-| Burza, śnieg, marznący deszcz (kody 2xx, 511, 6xx) | — | zawsze |
-| Wiatr | ≥ 25 km/h (czas roweru +10%) | ≥ 40 km/h (czas roweru +20%) |
-| Temperatura | ≤ 3 °C lub ≥ 28 °C | ≤ -5 °C lub ≥ 33 °C |
-
-Wynikowy komfort (`good` / `reduced` / `poor`) to najgorszy z czynników.
-
-**Wpływ na rekomendację:**
-
-- **Wagi czasu, kosztu i CO₂ się nie zmieniają.** Pogoda nie jest ukrytą czwartą metryką.
-- **Wiatr** wydłuża szacowany czas roweru. Dlatego zmienia wynik `fastest` i `balanced` tak samo
-  jak każda inna zmiana czasu i jest opisany w `assumptions`.
-- **Komfort `poor`** uruchamia jawną regułę (`scoring.comfort_rule`): rower trafia na koniec
-  rankingu przy każdym priorytecie (`score.weather_demoted: true`), o ile istnieje inny dostępny
-  wariant. Wśród pozostałych wariantów priorytet działa bez zmian. Na przykład `greenest` w ulewie
-  wybiera najniższą emisję spośród wariantów o akceptowalnym komforcie, a uzasadnienie mówi to
-  wprost. `balanced_score` i znormalizowane metryki roweru pozostają niezmienione.
-- **Komfort `reduced`** nie zmienia rankingu, tylko dodaje ostrzeżenie do uzasadnienia.
-- **Samochód i komunikacja miejska** nie są korygowane. Godziny odjazdów GTFS pozostają
-  rozkładowe, bez symulowania korków i opóźnień.
-
-### Odpowiedź API
-
-`GET /trips/{id}/compare` ma nowe, opcjonalne pola. Dotychczasowe pola nie zmieniły się:
-
-- `weather`: `status`, `adjustment_applied`, `explanation`, `is_forecast`, `location`,
-  `conditions` i `adjustment`,
-- `variants[].comfort_level`: `null`, gdy komfortu nie oceniano,
-- `variants[].score.weather_demoted`,
-- `scoring.comfort_rule`.
-
-Fragment rzeczywistej odpowiedzi z testu offline z mockiem ulewy (priorytet `greenest`, przystanek
-syntetyczny):
-
-```json
-"weather": {
-  "status": "applied",
-  "adjustment_applied": true,
-  "explanation": "Uwzględniono bieżącą pogodę Weatherbit w okolicy przystanku Dworzec Główny 01 (tylko komfort i czas roweru). Komfort roweru: niski (intensywny opad 4,0 mm/h).",
-  "is_forecast": false,
-  "location": {"stop_id": "A1", "stop_name": "Dworzec Główny 01", "lat": 54.355, "lon": 18.645},
-  "conditions": {
-    "source": "weatherbit_current",
-    "observed_at": "2026-11-11T10:20:00Z",
-    "temperature_c": 12.0,
-    "precipitation_mm_h": 4.0,
-    "snowfall_mm_h": 0.0,
-    "wind_speed_kmh": 10.8,
-    "description": "Heavy rain"
-  },
-  "adjustment": {"mode": "bike", "comfort_level": "poor", "duration_factor": 1.0, "reasons": ["intensywny opad 4,0 mm/h"]}
-},
-"recommendation": {
-  "mode": "public_transport",
-  "explanation": "Komunikacja miejska ma najniższą szacowaną emisję spośród wariantów o akceptowalnym komforcie pogodowym: ok. 0,20 kg CO₂. (…) Wariant „Rower” przesunięto na koniec rankingu: niski komfort przy bieżącej pogodzie. Wszystkie wartości są szacunkowe."
-}
+cd ../frontend && npm install && npm run dev
 ```
 
-## API: przykładowe żądania
+### Useful URLs
 
-Wszystkie endpointy mają prefiks `/api/v1`.
+| URL | Description |
+|---|---|
+| http://localhost:5173 | Frontend (Vite dev server) |
+| http://127.0.0.1:8000/docs | Swagger UI |
+| http://127.0.0.1:8000/redoc | ReDoc |
+| http://127.0.0.1:8000/api/v1/health | Health check |
 
-| Metoda   | Ścieżka                       | Opis                                         |
-|----------|-------------------------------|----------------------------------------------|
-| `GET`    | `/health`                     | Status aplikacji i bazy                      |
-| `GET`    | `/trips`                      | Lista (`skip`, `limit` ≤ 100, `q`)           |
-| `POST`   | `/trips`                      | Nowa podróż (201)                            |
-| `GET`    | `/trips/{id}`                 | Szczegóły                                    |
-| `PUT`    | `/trips/{id}`                 | Pełna aktualizacja                           |
-| `PATCH`  | `/trips/{id}`                 | Częściowa aktualizacja                       |
-| `DELETE` | `/trips/{id}`                 | Usunięcie (204)                              |
-| `GET`    | `/trips/{id}/compare`         | Porównanie i rekomendacja (`priority` opcjonalnie) |
-| `GET`    | `/stops`                      | Przystanki GTFS (`query` ≥ 2 znaki, `limit` ≤ 50) |
-| `GET`    | `/connections`                | Połączenia bezpośrednie (`origin_stop_id`, `destination_stop_id`, `departure_at`, `window_min`, `limit`) |
+### Frontend scripts
 
-Przykłady w PowerShell. W Windows PowerShell 5.1 `curl` jest aliasem `Invoke-WebRequest`,
-dlatego dla prawdziwego curla używaj `curl.exe`.
+| Command | Description |
+|---|---|
+| `npm run dev` | Vite dev server with the `/api` → backend proxy |
+| `npm run build` | Type check (`tsc -b`) and production build to `dist/` |
+| `npm run preview` | Preview of the production build (port 4173, with the same proxy) |
+| `npm run typecheck` | TypeScript only |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest (jsdom, no network, no backend needed) |
 
-> Windows PowerShell 5.1 dekoduje odpowiedzi JSON bez `charset` jako ISO-8859-1, więc polskie
-> znaki mogą się wyświetlić błędnie (np. `MokotÃ³w`). Dane w API i w bazie są poprawne (UTF-8).
-> PowerShell 7+, Swagger UI i `curl.exe` pokazują je prawidłowo.
+## Configuration
+
+The backend uses `pydantic-settings` ([`backend/app/core/config.py`](backend/app/core/config.py)).
+Every value has a default, so `backend/.env` is optional. Environment variables take precedence
+over `.env`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `APP_NAME` | `SmartRoute AI` | Name shown in Swagger UI and the health check |
+| `ENVIRONMENT` | `development` | `development` / `test` / `production` |
+| `DEBUG` | `false` | FastAPI debug mode and SQL logging |
+| `DATABASE_URL` | `sqlite:///./smartroute.db` | Trips database (relative to `backend/`) |
+| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated list of allowed origins |
+| `GTFS_DATABASE_URL` | `sqlite:///./gtfs.db` | Timetable database, created by the importer |
+| `GTFS_FEED_URL` | official ZTM Gdańsk feed | Default import source |
+| `GTFS_SEARCH_WINDOW_MIN` | `180` | How far ahead the comparison looks for a direct trip [min] |
+| `GTFS_MAX_DOWNLOAD_MB` | `200` | Download size limit for the feed ZIP |
+| `WEATHERBIT_API_KEY` | empty (disabled) | Weatherbit key. Set it **only** in `backend/.env` or the environment. |
+| `WEATHER_TIMEOUT_S` | `5` | HTTP timeout [s] |
+| `WEATHER_CACHE_TTL_S` | `1800` | Cache lifetime per location [s] |
+| `WEATHER_ERROR_COOLDOWN_S` | `300` | Pause after an error or HTTP 429 [s] |
+| `WEATHER_MAX_LEAD_MIN` | `120` | Maximum time to departure for applying current weather [min] |
+| `TRANSPORT__*` | see below | Model parameters, e.g. `TRANSPORT__CAR__FUEL_PRICE_PLN_PER_L=6.89` |
+
+Frontend (optional, `frontend/.env.local`, template in
+[`frontend/.env.example`](frontend/.env.example)):
+
+- `VITE_BACKEND_PROXY_TARGET` sets the backend address for the dev proxy. The default is
+  `http://127.0.0.1:8000`.
+- `VITE_API_BASE_URL` sets the full API URL when the frontend is served without the proxy.
+  In that case, also add the frontend origin to `CORS_ORIGINS`.
+
+Both SQLite files are created automatically and are ignored by Git. Tables are created at
+startup (`create_all`), and a small idempotent `upgrade_schema()` adds the nullable GTFS columns
+to older `trips` tables. There is no Alembic. To reset saved trips, stop the server and delete
+`backend/smartroute.db`.
+
+## GTFS integration (ZTM Gdańsk)
+
+Source: [Otwarte Dane Gdańsk — GTFS Static ZTM Gdańsk](https://ckan.multimediagdansk.pl/dataset/c24aa637-3619-4dc2-a171-a23eec8f2172/resource/30e783e4-2bec-4a7d-bb22-ee3e3b26ca96/download/gtfsgoogle.zip).
+ZTM publishes a new feed daily, and each feed covers about 15 days, so re-run the import
+regularly (e.g. daily via Windows Task Scheduler).
+
+**Import**
+
+- CSV files are streamed from the ZIP and inserted in batches, with about 50 MB peak memory for
+  the full feed. Nothing is extracted to disk.
+- Only known files in the archive root are read. Encrypted entries, archives over 1 GiB
+  uncompressed and suspicious compression ratios are rejected. Downloads have a size limit and
+  a timeout.
+- The import replaces the whole timetable in a single transaction. If it fails, the previous
+  timetable stays intact, and thanks to WAL mode the running server keeps reading during an
+  import.
+- Malformed rows (bad time format, unknown trip or stop, bad date) are skipped and counted in
+  the import report.
+- The importer handles the ZTM specifics: no `calendar.txt` (only `calendar_dates.txt`),
+  extended `route_type` values (700 bus, 900 tram) and times past `24:00:00`.
+
+**Connection search**
+
+- **Direct connections only:** the trip must stop at the origin and later, with a higher
+  `stop_sequence`, at the destination. Trips in the opposite direction are not returned.
+- The service calendar is respected. Stops with `pickup_type=1` / `drop_off_type=1` are skipped,
+  while `3` (request stop) counts as served.
+- GTFS times are counted from "noon minus 12 h" of the service day in `Europe/Warsaw`, which
+  handles DST changes and after-midnight trips. `departure_at` without a timezone is read as
+  Gdańsk local time. Responses include the UTC offset.
+
+**Use in the comparison.** A trip can carry `origin_stop_id`, `destination_stop_id` (from
+`GET /stops`) and `departure_at`. Free-text `origin` / `destination` are never geocoded.
+
+- If a direct trip departs within `GTFS_SEARCH_WINDOW_MIN` (180 min), the public transport option
+  uses `data_source: "gtfs_schedule"`. Its time is the wait plus the ride, and the line,
+  departure and arrival are listed in `assumptions`.
+- Otherwise it uses `data_source: "parametric_estimate"`, and the first assumption explains why:
+  no direct trip, unknown stop, missing field or timetable not imported.
+- In the UI, the card, the departures panel and, when public transport is the recommended option,
+  the recommendation panel state that the time is an estimate. They also say that transfers are
+  not searched and that the recommendation does not guarantee an available connection.
+  The option stays in the ranking.
+
+## Weather integration (Weatherbit)
+
+Optional, uses the free [Weatherbit Current Weather API](https://www.weatherbit.io/api/weather-current)
+(`GET /v2.0/current`, `units=M`). Forecasts are not used.
+
+1. Create a Weatherbit account and copy your API key. A new key may need some time to activate.
+2. Put it **only** in `backend/.env` (ignored by Git) or in an environment variable:
+   `WEATHERBIT_API_KEY=your_key`.
+3. Restart the backend. Without a key the integration is disabled (`weather.status: "disabled"`)
+   and comparisons are unchanged.
+
+The key is a `SecretStr`, so it is masked in `repr`. It is never logged or returned in error
+messages, and HTTP exceptions whose URL contains the key are not chained into tracebacks. The
+frontend never talks to Weatherbit.
+
+**When weather is applied.** All of the following conditions must hold. Otherwise
+`weather.status` names the reason and the result is identical to a run without weather.
+
+| Condition | Status otherwise |
+|---|---|
+| The bike option is available | `not_applicable` |
+| `WEATHERBIT_API_KEY` is set | `disabled` |
+| Departure is between 60 min ago and `WEATHER_MAX_LEAD_MIN` (120 min) from now | `out_of_time_window` |
+| The trip has an `origin_stop_id` with GTFS coordinates (the location is the origin stop) | `no_location` |
+| Weatherbit answered (from cache or the API); timeouts, 429, invalid key and bad payloads all degrade safely | `unavailable` |
+
+The client keeps a 30-minute in-process cache per 0.1° grid cell and pauses requests for
+5 minutes after any error. No request is made when weather cannot be applied.
+
+**Bike comfort rules** (deterministic thresholds, which are MVP assumptions):
+
+| Factor | `reduced` | `poor` |
+|---|---|---|
+| Precipitation | ≥ 0.2 mm/h | ≥ 2.5 mm/h |
+| Thunderstorm, snow, freezing rain (codes 2xx, 511, 6xx) or any snowfall | — | always |
+| Wind | ≥ 25 km/h (bike time +10%) | ≥ 40 km/h (bike time +20%) |
+| Temperature | ≤ 3 °C or ≥ 28 °C | ≤ −5 °C or ≥ 33 °C |
+
+The overall comfort is the worst factor. The time, cost and CO₂ weights never change.
+`reduced` only adds a warning. `poor` moves the bike to the end of the ranking for every
+priority, if another option is available. The explanation says so, and the bike keeps its
+scores (`score.weather_demoted: true`). Car and public transport are not adjusted.
+
+**How it was verified.** The automated tests use mocked Weatherbit responses and make no network
+calls. Separately, the author ran a manual test of the comparison endpoint with a real API key:
+the response contained real current weather data with `weather.status: "applied"`. This was a
+one-off manual check, not an automated integration test.
+
+## Comparison model and recommendation
+
+Default parameters ([`backend/app/core/transport_params.py`](backend/app/core/transport_params.py)),
+all overridable via `TRANSPORT__*`:
+
+| Mode | Time | Cost | CO₂ |
+|---|---|---|---|
+| Car | distance ÷ 40 km/h + 5 min parking | fuel only: 7 l/100 km × 6.50 PLN/l, shared by the passengers | 0.17 kg/km per vehicle |
+| Public transport | GTFS schedule, or distance ÷ 22 km/h + 8 min access and waiting | 4.40 PLN per person up to 10 km, + 0.25 PLN/km beyond (example tariff) | 0.05 kg per passenger-km |
+| Bike | distance ÷ 15 km/h (+ wind adjustment) | 0 PLN | 0 kg; available up to 20 km |
+
+The car is unavailable with `has_car=false` and the bike with `allow_bike=false` or above 20 km.
+Unavailable options are shown with the reason and never recommended.
+
+**Recommendation** ([`backend/app/services/recommendation_service.py`](backend/app/services/recommendation_service.py)):
+
+1. Only available options are considered. Values are compared as returned by the API (rounded).
+2. `fastest`, `cheapest` and `greenest` order the options lexicographically by the main metric,
+   then the remaining ones (e.g. fastest: time → cost → CO₂). If the main metric is tied, the
+   explanation says which secondary metric decided.
+3. `balanced` applies min-max normalisation per metric (0 = best, 1 = worst) and scores
+   `1/3·time + 1/3·cost + 1/3·CO₂`. The lowest score wins.
+4. A complete tie is resolved by the fixed order bike → public transport → car
+   (`scoring.tie_break_order`), so the result is always deterministic.
+5. The weather comfort rule described above is applied as a separate, explicit step.
+
+The response includes a Polish explanation, the per-mode normalised scores and the method
+description. In the UI, "best value" badges compare values at display precision and mark equal
+values as "ex aequo".
+
+## API overview
+
+All endpoints are prefixed with `/api/v1`. The full schema is in Swagger UI (`/docs`).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Application and database status |
+| `GET` | `/trips` | List (`skip`, `limit` ≤ 100, `q` search) |
+| `POST` | `/trips` | Create a trip (201) |
+| `GET` / `PUT` / `PATCH` / `DELETE` | `/trips/{id}` | Read, replace, update, delete (204) |
+| `GET` | `/trips/{id}/compare` | Comparison and recommendation (optional `priority` override, not saved) |
+| `GET` | `/stops` | GTFS stop search (`query` ≥ 2 characters, accent-insensitive; `limit` ≤ 50) |
+| `GET` | `/connections` | Direct connections (`origin_stop_id`, `destination_stop_id`, `departure_at`, `window_min`, `limit`) |
+
+Example (PowerShell; use `curl.exe` rather than the `curl` alias):
 
 ```powershell
 $api = 'http://127.0.0.1:8000/api/v1'
+Invoke-RestMethod "$api/stops?query=zaspa&limit=3"
 
-# Health check
-Invoke-RestMethod "$api/health"
-
-# Nowa podróż
 $body = @{
-    name        = 'Dom - praca'
-    origin      = 'Mokotów'
-    destination = 'Centrum'
-    distance_km = 7.5
-    passengers  = 1
-    priority    = 'balanced'   # fastest | cheapest | greenest | balanced
-    has_car     = $true
-    allow_bike  = $true
+    name = 'Dworzec - Zaspa'; origin = 'Dworzec Główny 01'; destination = 'Zaspa 01'
+    distance_km = 5.5; passengers = 1; priority = 'balanced'; has_car = $true; allow_bike = $true
+    origin_stop_id = '2001'; destination_stop_id = '2089'; departure_at = '2026-11-12T07:55:00'
 } | ConvertTo-Json
 $trip = Invoke-RestMethod "$api/trips" -Method Post -ContentType 'application/json; charset=utf-8' `
     -Body ([Text.Encoding]::UTF8.GetBytes($body))
-
-# Lista z wyszukiwaniem
-Invoke-RestMethod "$api/trips?q=mokotów&limit=10"
-
-# Częściowa aktualizacja
-Invoke-RestMethod "$api/trips/$($trip.id)" -Method Patch -ContentType 'application/json' `
-    -Body '{"passengers": 3}'
-
-# Porównanie (z opcjonalnym nadpisaniem priorytetu)
 Invoke-RestMethod "$api/trips/$($trip.id)/compare?priority=fastest" | ConvertTo-Json -Depth 6
-
-# Usunięcie
-Invoke-RestMethod "$api/trips/$($trip.id)" -Method Delete
 ```
 
-Rozkład GTFS (po imporcie). Identyfikatory poniżej pochodzą z feedu z 11.11.2026; przed
-użyciem sprawdź je przez `/stops`:
+Stop IDs come from the imported feed, so check them with `/stops` first. The departure must fall
+within the feed's validity period (`python -m app.cli.gtfs info`). Windows PowerShell 5.1 may
+display Polish characters incorrectly, but the data itself is UTF-8 and PowerShell 7 shows it
+correctly.
 
-```powershell
-# Przystanki: "glowny" znajdzie "Dworzec Główny 01" itd.
-Invoke-RestMethod "$api/stops?query=dworzec%20glowny&limit=5"
-
-# Bezpośrednie połączenia Dworzec Główny 01 (2001) -> Zaspa 01 (2089)
-Invoke-RestMethod "$api/connections?origin_stop_id=2001&destination_stop_id=2089&departure_at=2026-11-12T07:55:00&limit=3" |
-    ConvertTo-Json -Depth 5
-
-# Podróż z przystankami i godziną — porównanie użyje czasu z rozkładu
-$body = @{
-    name = 'Dworzec - Zaspa'; origin = 'Dworzec'; destination = 'Zaspa'; distance_km = 5.5
-    origin_stop_id = '2001'; destination_stop_id = '2089'; departure_at = '2026-11-12T07:55:00'
-} | ConvertTo-Json
-$trip = Invoke-RestMethod "$api/trips" -Method Post -ContentType 'application/json' -Body $body
-(Invoke-RestMethod "$api/trips/$($trip.id)/compare").variants |
-    Where-Object mode -eq 'public_transport' | Select-Object data_source, estimated_duration_min, assumptions
-```
-
-<details>
-<summary>Przykładowa odpowiedź <code>GET /connections</code> (rzeczywiste dane ZTM, skrócona)</summary>
+Error format:
 
 ```json
-{
-  "origin": {
-    "stop_id": "2001", "stop_name": "Dworzec Główny 01", "stop_code": "2001",
-    "stop_lat": 54.355509269859, "stop_lon": 18.645663339105
-  },
-  "destination": {
-    "stop_id": "2089", "stop_name": "Zaspa 01", "stop_code": "2089",
-    "stop_lat": 54.399349725366, "stop_lon": 18.594910597792
-  },
-  "departure_at": "2026-11-12T07:55:00+01:00",
-  "window_min": 120,
-  "data_source": "gtfs_schedule",
-  "is_realtime": false,
-  "feed": {
-    "source": "https://ckan.multimediagdansk.pl/.../gtfsgoogle.zip",
-    "imported_at": "2026-11-11T18:16:02.268882Z",
-    "timezone": "Europe/Warsaw",
-    "valid_from": "2026-11-11",
-    "valid_to": "2026-11-25"
-  },
-  "connections": [
-    {
-      "trip_id": "2202611120733_111_002-06",
-      "route_id": "2",
-      "line": "2",
-      "route_type": 900,
-      "headsign": "Jelitkowo",
-      "direction_id": 0,
-      "service_date": "2026-11-12",
-      "departure_at": "2026-11-12T07:57:00+01:00",
-      "arrival_at": "2026-11-12T08:19:00+01:00",
-      "duration_min": 22.0,
-      "origin_stop_sequence": 15,
-      "destination_stop_sequence": 30
-    }
-  ],
-  "notes": [
-    "Rozkład planowy GTFS Static — bez opóźnień i danych w czasie rzeczywistym.",
-    "Tylko połączenia bezpośrednie (bez przesiadek)."
-  ]
-}
-```
-
-W porównaniu podróży wariant „Komunikacja miejska” dostaje wtedy np.:
-`"data_source": "gtfs_schedule"`, `"estimated_duration_min": 24.0` oraz założenia
-„Czas z rozkładu GTFS: linia 2 w kierunku Jelitkowo, odjazd 12.11.2026 07:57 z przystanku
-Dworzec Główny 01, przyjazd 08:19 na przystanek Zaspa 01.” i „Czas = oczekiwanie 2 min…
-+ przejazd 22,0 min; bez dojścia do i z przystanku.”
-
-</details>
-
-Odczyt przez `curl.exe` (żądania z ciałem JSON najwygodniej wysyłać przez `Invoke-RestMethod`
-lub Swagger UI, bo zasady cytowania argumentów różnią się między wersjami PowerShell):
-
-```powershell
-curl.exe http://127.0.0.1:8000/api/v1/trips
-curl.exe "http://127.0.0.1:8000/api/v1/trips/1/compare?priority=greenest"
-```
-
-<details>
-<summary>Przykładowa odpowiedź <code>GET /trips/1/compare</code> (skrócona do jednego wariantu)</summary>
-
-```json
-{
-  "trip_id": 1,
-  "priority": "balanced",
-  "distance_km": 7.5,
-  "passengers": 1,
-  "is_estimate": true,
-  "disclaimer": "Wszystkie wartości są szacunkami z uproszczonego modelu i przyjętych parametrów konfiguracji. ...",
-  "variants": [
-    {
-      "mode": "car",
-      "label": "Samochód",
-      "available": true,
-      "unavailable_reason": null,
-      "estimated_duration_min": 16.2,
-      "estimated_cost_pln": 3.41,
-      "estimated_cost_per_passenger_pln": 3.41,
-      "estimated_co2_kg": 1.275,
-      "estimated_co2_per_passenger_kg": 1.275,
-      "is_estimate": true,
-      "data_source": "parametric_estimate",
-      "assumptions": [
-        "Średnia prędkość 40 km/h, bez danych o bieżącym natężeniu ruchu.",
-        "Doliczono 5 min na parkowanie.",
-        "..."
-      ],
-      "score": {
-        "rank": 2,
-        "normalized_duration": 0.0,
-        "normalized_cost": 0.775,
-        "normalized_co2": 1.0,
-        "balanced_score": 0.5917
-      }
-    }
-  ],
-  "recommendation": {
-    "mode": "bike",
-    "label": "Rower",
-    "explanation": "Rower daje najlepszy kompromis czasu, kosztu i emisji (wynik 0,33 w skali 0–1, im mniej, tym lepiej). ...",
-    "tie_break_applied": false
-  },
-  "scoring": {
-    "priority": "balanced",
-    "description": "Normalizacja min-max każdej metryki wśród dostępnych wariantów ...",
-    "balanced_weights": { "duration": 0.3333, "cost": 0.3333, "co2": 0.3333 },
-    "tie_break_order": ["bike", "public_transport", "car"]
-  }
-}
-```
-
-</details>
-
-Przykładowe błędy:
-
-```json
-// 404
 { "detail": "Podróż o id=999 nie istnieje", "code": "not_found" }
-
-// 422
-{
-  "detail": [{ "loc": ["body", "distance_km"], "msg": "Input should be greater than 0", "type": "greater_than" }],
-  "code": "validation_error"
-}
 ```
 
-## Testy i jakość kodu
+## Testing and code quality
 
-Testy używają bazy SQLite w pamięci. Nie dotykają plików `smartroute.db` ani `gtfs.db`,
-nie wymagają pliku `.env` i **nie łączą się z siecią**. Testy GTFS budują mały syntetyczny ZIP
-([`tests/gtfs_factory.py`](backend/tests/gtfs_factory.py)) z samym `calendar_dates.txt`, kursem
-po północy (`24:20:00`), przystankiem bez połączeń i celowo błędnymi wierszami.
+Backend tests use in-memory SQLite and a small synthetic GTFS ZIP
+([`backend/tests/gtfs_factory.py`](backend/tests/gtfs_factory.py)). Weather tests use mocked
+Weatherbit responses. The tests need no `.env`, never touch the local databases and make no
+network calls.
 
 ```powershell
 cd backend
-..\.venv\Scripts\python.exe -m pytest                       # wszystkie testy
-..\.venv\Scripts\python.exe -m pytest --cov                 # z raportem pokrycia
-..\.venv\Scripts\python.exe -m ruff check .                 # lint
-..\.venv\Scripts\python.exe -m ruff format --check .        # kontrola formatowania
+..\.venv\Scripts\python.exe -m pytest                  # unit + API tests
+..\.venv\Scripts\python.exe -m pytest --cov            # with coverage
+..\.venv\Scripts\python.exe -m ruff check .            # lint
+..\.venv\Scripts\python.exe -m ruff format --check .   # formatting
+
+cd ..\frontend
+npm test                                               # Vitest + Testing Library
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Testy są podzielone na `tests/unit` (kalkulatory, rekomendacja, schematy, konfiguracja, bez
-infrastruktury) oraz `tests/api` (endpointy przez `TestClient`, kody błędów, CORS).
+- `backend/tests/unit` covers the calculators, recommendation, weather rules and client, the
+  GTFS importer and time handling, schemas and configuration.
+- `backend/tests/api` covers the endpoints through `TestClient`, error codes and CORS.
+- Frontend tests cover form validation and stop search, result rendering (ranking,
+  unavailable options, GTFS vs estimate labels, recommendation warnings, ties), formatting
+  and the API client.
 
-### Aktualizacja zależności
+Automated tests do not check visual layout. The manual check for 360 / 768 / 1024 / 1440 px is
+described in [`docs/README.pl.md`](docs/README.pl.md#ręczna-weryfikacja-układu).
 
-Po zmianie `pyproject.toml` zainstaluj zależności bez pliku constraints, uruchom testy
-i odśwież plik z przypiętymi wersjami:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]" --upgrade
-.\.venv\Scripts\python.exe -m pip freeze --exclude-editable | Out-File -Encoding utf8 .\backend\requirements-lock.txt
-```
-
-## Struktura projektu
+## Project structure
 
 ```
 smartroute-ai/
-├── setup.ps1                  # przygotowanie środowiska (Windows)
-├── run.ps1                    # uruchomienie backendu
-├── import-gtfs.ps1            # import / odświeżenie rozkładu GTFS
-├── architecture-plan.md       # docelowa architektura MVP (backend + frontend)
-├── frontend/                  # React + TypeScript + Vite (zob. sekcja Frontend)
-└── backend/
-    ├── pyproject.toml         # zależności, konfiguracja pytest i ruff
-    ├── requirements-lock.txt  # przypięte wersje (constraints)
-    ├── .env.example
-    ├── app/
-    │   ├── main.py            # create_app(), CORS, lifespan (create_all + migracja), routery
-    │   ├── cli/gtfs.py        # CLI: python -m app.cli.gtfs import | info
-    │   ├── core/              # konfiguracja, enumy, strefa czasowa, parametry modelu, błędy
-    │   ├── db/                # silniki i sesje (podróże + GTFS), typy, migracje
-    │   ├── models/            # modele ORM (trip, gtfs)
-    │   ├── schemas/           # schematy Pydantic (kontrakt API)
-    │   ├── repositories/      # dostęp do danych (podróże, rozkład)
-    │   ├── services/
-    │   │   ├── gtfs/          # importer, czas GTFS, wyszukiwanie połączeń
-    │   │   ├── transport/     # kalkulatory, GtfsTransitTimeProvider
-    │   │   └── weather/       # klient Weatherbit (cache), ocena i korekta pogodowa
-    │   └── api/v1/            # endpointy
-    └── tests/
-        ├── unit/
-        └── api/
+├── setup.ps1 · run.ps1 · import-gtfs.ps1   # Windows helper scripts
+├── architecture-plan.md                    # original planning document (Polish, historical)
+├── docs/README.pl.md                       # detailed Polish documentation
+├── backend/
+│   ├── pyproject.toml · requirements-lock.txt · .env.example
+│   ├── app/
+│   │   ├── main.py                         # app factory, CORS, lifespan, routers
+│   │   ├── api/v1/                         # endpoints: meta (health), trips, comparisons, gtfs
+│   │   ├── cli/gtfs.py                     # python -m app.cli.gtfs import | info
+│   │   ├── core/                           # settings, enums, model parameters, errors, timezone
+│   │   ├── db/ · models/ · repositories/   # engines/sessions, ORM models, data access
+│   │   ├── schemas/                        # Pydantic API contract
+│   │   └── services/
+│   │       ├── transport/                  # car, public transport, bike, GTFS time provider
+│   │       ├── gtfs/                       # importer, GTFS time, connection search
+│   │       ├── weather/                    # Weatherbit client, assessment and adjustment
+│   │       ├── comparison_service.py
+│   │       └── recommendation_service.py
+│   └── tests/ (unit/, api/)
+└── frontend/
+    ├── vite.config.ts · eslint.config.js · .env.example
+    └── src/
+        ├── pages/DashboardPage.tsx         # layout and flow orchestration
+        ├── components/                     # TripForm, StopPicker, VariantCard, RecommendationPanel,
+        │                                   # SchedulePanel, WeatherPanel, HelpPanel, ui/…
+        ├── hooks/                          # useComparison, useStopSearch, useBackendHealth
+        ├── services/                       # fetch client (ApiError) and endpoint functions
+        ├── types/api.ts                    # API contract types
+        └── utils/                          # formatting, dates, validation, errors, results, GTFS status
 ```
 
-Warstwy: **api → services → repositories → models**. Kalkulatory i rekomendacja nie zależą od
-FastAPI ani bazy danych.
+## AI-assisted development
 
-## Ograniczenia MVP
+This project was built with substantial help from AI tools. The split of work was as follows:
 
-- **Szacunki zamiast danych rzeczywistych.** Czas samochodu i roweru liczony jest jako dystans /
-  średnia prędkość plus stałe narzuty, a ceny i emisje to przyjęte parametry. Brak danych o ruchu.
-- **Rozkład GTFS — ograniczony zakres:**
-  - tylko planowy GTFS Static ZTM Gdańsk, bez GTFS-Realtime i opóźnień,
-  - tylko połączenia bezpośrednie, bez przesiadek, czasu dojścia do przystanku i SKM/PKM,
-  - przystanki trzeba wskazać jawnie przez `stop_id`, bez geokodowania i najbliższego przystanku,
-  - rozkład jest ważny około 15 dni i wymaga regularnego importu,
-  - `shapes.txt` nie jest importowany,
-  - przy imporcie SQLite przez chwilę potrzebuje około 2× rozmiaru bazy na dysku
-    (stare i nowe dane do COMMIT).
-- **Pogoda — ograniczony zakres:**
-  - tylko pogoda bieżąca, bez prognozy, więc działa tylko dla podróży w ciągu ok. 2 h,
-  - lokalizacja wyłącznie z przystanku startowego GTFS, a pogoda w miejscu docelowym
-    nie jest sprawdzana,
-  - progi komfortu to założenia, a kierunek wiatru względem trasy jest nieznany,
-  - cache jest w pamięci procesu, więc znika po restarcie i nie jest współdzielony
-    między workerami,
-  - integracja nie była jeszcze sprawdzona na prawdziwym API, bo klucz jest w trakcie
-    aktywacji; testy używają mockowanych odpowiedzi w formacie z dokumentacji.
-- **Dystans podaje użytkownik w km.** Brak geokodowania i wyznaczania tras, a punkt startu i cel to
-  zwykły tekst.
-- **Brak uwierzytelniania.** Jeden anonimowy użytkownik, a dane są wspólne dla wszystkich klientów API.
-- **Uproszczone migracje.** Tabele tworzy `create_all`, a nowe kolumny nullable dodaje
-  `upgrade_schema()` (zob. [Baza danych](#baza-danych)). Brak Alembica.
-- **SQLite** wystarcza do pracy lokalnej i demonstracji, ale nie jest przeznaczona do wdrożeń
-  wieloinstancyjnych.
-- Tylko waluta PLN. Komunikaty API są po polsku.
-- **Frontend:**
-  - jedna strona bez historii zapisanych podróży (CRUD jest dostępny w API, ale bez widoku listy),
-  - każde porównanie z nowymi danymi zapisuje podróż w bazie backendu,
-  - wybór przystanków jest wymagany, więc bez importu GTFS porównania nie da się uruchomić
-    z interfejsu (w API nadal działa),
-  - tylko ciemny motyw i brak map,
-  - opis warunków pogodowych pochodzi z Weatherbit w języku angielskim (np. „Few clouds”).
-- Brak konteneryzacji.
-- Znane ostrzeżenie w testach: Starlette zgłasza `StarletteDeprecationWarning` dotyczące użycia
-  `httpx` w `TestClient`. Nie wpływa ono na wyniki testów.
+- **The author** came up with the application concept and defined its requirements, as well as
+  the scope and constraints of each development stage.
+- **ChatGPT and Claude Code** were used to plan the work and to generate and modify the code.
+  A significant part of the backend and frontend implementation, the automated tests and this
+  documentation was generated by AI, based on the author's requirements and instructions.
+- **Automated tests** (pytest, Vitest) were generated by AI. Claude Code ran them, together with
+  the linters and builds, and reported the results.
+- **Manual testing by the author:** selected endpoints were tested in Swagger UI, and the
+  behaviour of the user interface was checked in the browser. The author also ran the manual
+  Weatherbit check described in [Weather integration](#weather-integration-weatherbit).
 
-## Planowane funkcje
+The author has **not yet carried out a full, independent review of the entire codebase**.
 
-- Widok historii zapisanych podróży we frontendzie (edycja i usuwanie przez istniejące API)
-- Połączenia z przesiadkami (np. RAPTOR / CSA na zaimportowanych `stop_times`)
-- Wybór najbliższych przystanków po współrzędnych i czas dojścia pieszo
-- GTFS-Realtime (opóźnienia) jako osobne, jawnie oznaczone źródło danych
-- Automatyczne, cykliczne odświeżanie rozkładu
-- Integracja z API map (dystans i trasa zamiast ręcznego wpisu)
-- Migracje bazy (Alembic)
-- Docker i CI
+## Known limitations
+
+- **Estimates, not measurements.** Car and bike times use average speeds without traffic data.
+  Prices, fares and emission factors are configured assumptions.
+- **Public transport is limited to direct, scheduled trips.** There are no transfers, no
+  real-time delays (no GTFS-Realtime), no walking time to and from stops, and SKM/PKM rail
+  services are not included. A missing direct trip leads to an estimate, not to a confirmed
+  connection. The app does **not guarantee** that a direct public transport connection exists,
+  even when public transport is the recommended option.
+- **The timetable must be refreshed.** A feed is valid for about 15 days, and `shapes.txt` is not
+  imported.
+- **Distance is entered manually.** There is no geocoding, routing or map. Stops must be picked
+  explicitly. The nearest stop is not suggested.
+- **Weather is current only.** It applies to departures within about 2 hours, at the origin stop
+  only. Comfort thresholds are assumptions, and the wind direction relative to the route is
+  unknown. The cache is in-process, so it is lost on restart and not shared between workers.
+  Weather descriptions are in English (from Weatherbit).
+- **Frontend:** a single page without a list of saved trips (CRUD exists only in the API). Every
+  comparison with new input saves a trip. The dashboard requires an imported timetable.
+  Dark theme only. The UI is in Polish.
+- **Backend:** no authentication (single anonymous user), SQLite only, no Alembic migrations,
+  PLN only, API messages in Polish.
+- **Tooling:** the helper scripts are Windows-only. There is no Docker and no CI. `npm audit`
+  reports moderate advisories in dev-only lint dependencies. Tests emit a known
+  `StarletteDeprecationWarning` about `httpx` in `TestClient`.
+
+## Possible next steps
+
+- Trip history view in the frontend (edit and delete via the existing API)
+- Connections with transfers (e.g. RAPTOR / CSA on the imported `stop_times`)
+- Nearest stops by coordinates and walking time
+- GTFS-Realtime delays as a separate, explicitly labelled data source
+- Scheduled timetable refresh; map integration for distance and route
+- Alembic migrations, Docker and CI
