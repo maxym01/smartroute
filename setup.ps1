@@ -126,8 +126,10 @@ if (Test-Path $EnvFile) {
 }
 
 Write-Host ''
-Write-Host 'Gotowe. Uruchom backend poleceniem:  .\run.ps1' -ForegroundColor Green
-Write-Host 'Rozkład GTFS ZTM Gdańsk (opcjonalnie):  .\import-gtfs.ps1' -ForegroundColor Green
+Write-Host 'Gotowe. Dalsze kroki:' -ForegroundColor Green
+Write-Host '  Zależności frontendu (raz):  cd frontend; npm install; cd ..' -ForegroundColor Green
+Write-Host '  Rozkład GTFS ZTM Gdańsk (potrzebny w interfejsie):  .\import-gtfs.ps1' -ForegroundColor Green
+Write-Host '  Backend i frontend:  .\run.ps1   (sam backend:  .\run.ps1 -BackendOnly)' -ForegroundColor Green
 if (-not $NoDev) {
-    Write-Host 'Testy:  cd backend; ..\.venv\Scripts\python.exe -m pytest' -ForegroundColor Green
+    Write-Host '  Testy:  cd backend; ..\.venv\Scripts\python.exe -m pytest' -ForegroundColor Green
 }

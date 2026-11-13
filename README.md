@@ -154,23 +154,38 @@ cd smartroute-ai
 # 1. Backend environment: creates .venv, installs pinned dependencies, copies backend/.env.example to backend/.env
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 
-# 2. Timetable (needed for stop search in the UI): downloads the ZTM Gdańsk feed (~30 s, ~125 MB database)
+# 2. Frontend dependencies (once; versions pinned in package-lock.json)
+cd frontend; npm install; cd ..
+
+# 3. Timetable (needed for stop search in the UI): downloads the ZTM Gdańsk feed (~30 s, ~125 MB database)
 powershell -ExecutionPolicy Bypass -File .\import-gtfs.ps1
 
-# 3. Backend: http://127.0.0.1:8000 (Swagger UI at /docs)
+# 4. Backend (http://127.0.0.1:8000, Swagger UI at /docs) and frontend (http://localhost:5173)
 powershell -ExecutionPolicy Bypass -File .\run.ps1
 ```
 
-In a second terminal:
+Open **http://localhost:5173**. The Vite dev server proxies `/api` to `http://127.0.0.1:8000`,
+so the browser only sees one origin. Press **Ctrl+C** in the same terminal to stop both servers.
+
+`run.ps1` works from any current directory and runs both servers in one console:
+
+- It checks the prerequisites (`.venv` with FastAPI and Uvicorn, Node.js ≥ 22.12,
+  `frontend/node_modules`) and explains what to run if something is missing. It never installs
+  packages itself.
+- If port 8000 or 5173 already serves SmartRoute, that server is reused instead of starting a
+  second instance. If the port is taken by another program, the script stops before starting
+  anything.
+- Ctrl+C stops both servers together with their child processes (Uvicorn's reload worker). If one
+  server exits on its own, the other one is stopped too.
 
 ```powershell
-cd frontend
-npm install
-npm run dev          # http://localhost:5173
+.\run.ps1                                  # backend + frontend
+.\run.ps1 -BackendOnly                     # API only (no Node.js needed)
+.\run.ps1 -FrontendOnly                    # frontend only, against an already running backend
+.\run.ps1 -Port 8001 -FrontendPort 5174    # other ports; the Vite proxy follows -Port
+.\run.ps1 -NoReload                        # backend without auto-reload
+.\run.ps1 -BindHost 0.0.0.0                # backend reachable from the local network
 ```
-
-Open **http://localhost:5173**. The Vite dev server proxies `/api` to `http://127.0.0.1:8000`,
-so the browser only sees one origin.
 
 > `-ExecutionPolicy Bypass` applies to that single call only. To run the scripts directly
 > (`.\setup.ps1`), allow local scripts for your user:
@@ -180,7 +195,7 @@ so the browser only sees one origin.
 |---|---|
 | `setup.ps1` | Creates `.venv` from Python 3.12 if it is missing. It stops with an error, and deletes nothing, if an existing `.venv` uses another Python version. Then it runs `pip install -e "backend[dev]" -c backend/requirements-lock.txt` and `pip check`, and copies `.env.example` to `.env` only if `.env` does not exist. It is idempotent. `-NoDev` installs runtime dependencies only. |
 | `import-gtfs.ps1` | Runs `python -m app.cli.gtfs import` from `backend/`. `-Source <url-or-zip>` imports from another URL or a local ZIP. Re-importing replaces the timetable in one transaction. |
-| `run.ps1` | Starts Uvicorn from `backend/`, where `.env` and the relative SQLite paths are resolved. Options: `-Port 8080`, `-BindHost 0.0.0.0`, `-NoReload`. |
+| `run.ps1` | Starts the backend (Uvicorn from `backend/`, where `.env` and the relative SQLite paths are resolved) and the frontend (Vite from `frontend/`) in one console; Ctrl+C stops both. Options: `-BackendOnly`, `-FrontendOnly`, `-Port`, `-FrontendPort`, `-BindHost`, `-NoReload`. |
 
 Without an imported timetable, the API still works: comparisons use the estimate, and `/stops`
 and `/connections` return `503 gtfs_not_imported`. The UI requires stop selection, though, so
@@ -199,7 +214,8 @@ python -m app.cli.gtfs import              # optional: timetable
 python -m app.cli.gtfs info                # source, import time, validity, record counts
 python -m uvicorn app.main:app --reload    # http://127.0.0.1:8000
 
-cd ../frontend && npm install && npm run dev
+# in a second terminal
+cd frontend && npm install && npm run dev  # http://localhost:5173
 ```
 
 ### Useful URLs

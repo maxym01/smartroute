@@ -24,7 +24,7 @@ ten sam wynik.
 - [Stack technologiczny](#stack-technologiczny)
 - [Wymagania](#wymagania)
 - [Szybki start (Windows)](#szybki-start-windows)
-- [Uruchomienie backendu](#uruchomienie-backendu)
+- [Uruchomienie aplikacji](#uruchomienie-aplikacji)
 - [Frontend (React + TypeScript)](#frontend-react--typescript)
 - [Konfiguracja](#konfiguracja)
 - [Baza danych](#baza-danych)
@@ -109,18 +109,14 @@ py -3.12 --version
 git clone <URL-repozytorium> smartroute-ai
 cd smartroute-ai
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
-powershell -ExecutionPolicy Bypass -File .\import-gtfs.ps1   # opcjonalnie: rozkład ZTM (~30 s)
-powershell -ExecutionPolicy Bypass -File .\run.ps1
+cd frontend; npm install; cd ..                              # zależności frontendu (raz)
+powershell -ExecutionPolicy Bypass -File .\import-gtfs.ps1   # rozkład ZTM (~30 s), potrzebny w interfejsie
+powershell -ExecutionPolicy Bypass -File .\run.ps1           # backend + frontend
 ```
 
-Następnie otwórz Swagger UI: **http://127.0.0.1:8000/docs**. Frontend uruchamia się w drugim
-terminalu ([instrukcja](#frontend-react--typescript)):
-
-```powershell
-cd frontend
-npm install
-npm run dev          # http://localhost:5173
-```
+Następnie otwórz **http://localhost:5173** (aplikacja) albo **http://127.0.0.1:8000/docs**
+(Swagger UI). Oba serwery zatrzymasz klawiszami **Ctrl+C** w tym samym terminalu
+([szczegóły](#uruchomienie-aplikacji)).
 
 Bez importu rozkładu API nadal działa: `/stops` i `/connections` zwracają wtedy
 `503 gtfs_not_imported`, a porównanie używa szacunku parametrycznego. Interfejs wymaga jednak
@@ -154,24 +150,38 @@ Copy-Item .\backend\.env.example .\backend\.env
 
 </details>
 
-## Uruchomienie backendu
+## Uruchomienie aplikacji
 
 ```powershell
-.\run.ps1                       # http://127.0.0.1:8000, z auto-reload
-.\run.ps1 -Port 8080            # inny port
-.\run.ps1 -NoReload             # bez auto-reload
-.\run.ps1 -BindHost 0.0.0.0     # dostęp z sieci lokalnej
+.\run.ps1                                  # backend (:8000, z auto-reload) + frontend (:5173)
+.\run.ps1 -BackendOnly                     # tylko API (Node.js niepotrzebny)
+.\run.ps1 -FrontendOnly                    # tylko frontend, gdy backend już działa
+.\run.ps1 -Port 8001 -FrontendPort 5174    # inne porty; proxy Vite kieruje na -Port
+.\run.ps1 -NoReload                        # backend bez auto-reload
+.\run.ps1 -BindHost 0.0.0.0                # backend dostępny z sieci lokalnej
 ```
 
-`run.ps1` używa interpretera z `.venv` i uruchamia Uvicorn **z katalogu `backend/`**, niezależnie
-od tego, skąd wywołano skrypt. Ma to znaczenie, bo z tego katalogu wczytywany jest `.env`
-i względem niego liczona jest ścieżka do bazy SQLite.
+`run.ps1` uruchamia oba serwery w jednym oknie konsoli i działa niezależnie od bieżącego katalogu:
 
-Odpowiednik ręczny:
+- **Backend** startuje z interpretera `.venv` **z katalogu `backend/`**. Ma to znaczenie, bo z tego
+  katalogu wczytywany jest `.env` i względem niego liczona jest ścieżka do bazy SQLite.
+- **Frontend** to serwer deweloperski Vite uruchamiany z katalogu `frontend/`.
+- **Sprawdzenie wymagań:** skrypt sprawdza `.venv` z FastAPI i Uvicorn, Node.js ≥ 22.12
+  i `frontend/node_modules`, a przy braku podaje polecenie do wykonania. Sam niczego nie instaluje.
+- **Zajęte porty:** jeśli na porcie 8000 lub 5173 działa już SmartRoute, skrypt nie uruchamia
+  drugiej instancji. Jeśli port zajmuje inny program, skrypt kończy się błędem, zanim cokolwiek
+  uruchomi.
+- **Zatrzymanie:** Ctrl+C kończy oba serwery razem z procesami potomnymi (np. procesem roboczym
+  auto-reload Uvicorna). Gdy jeden serwer zakończy się sam, skrypt zatrzymuje także drugi.
+
+Odpowiednik ręczny (dwa terminale):
 
 ```powershell
 cd backend
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+
+cd frontend
+npm run dev
 ```
 
 | Adres                                  | Opis                   |
@@ -189,8 +199,9 @@ się z Weatherbit (klucz zostaje w `backend/.env`).
 
 ### Uruchomienie
 
-Wymaga działającego backendu (`.\run.ps1`). Wyszukiwarka przystanków potrzebuje zaimportowanego
-rozkładu (`.\import-gtfs.ps1`).
+Najprościej uruchomić frontend razem z backendem poleceniem `.\run.ps1`
+([szczegóły](#uruchomienie-aplikacji)). Wyszukiwarka przystanków potrzebuje zaimportowanego
+rozkładu (`.\import-gtfs.ps1`). Ręcznie, przy działającym backendzie:
 
 ```powershell
 cd frontend
@@ -909,7 +920,7 @@ i odśwież plik z przypiętymi wersjami:
 ```
 smartroute-ai/
 ├── setup.ps1                  # przygotowanie środowiska (Windows)
-├── run.ps1                    # uruchomienie backendu
+├── run.ps1                    # uruchomienie backendu i frontendu
 ├── import-gtfs.ps1            # import / odświeżenie rozkładu GTFS
 ├── architecture-plan.md       # archiwalny plan sprzed implementacji (nie opisuje stanu obecnego)
 ├── docs/README.pl.md          # ta dokumentacja
