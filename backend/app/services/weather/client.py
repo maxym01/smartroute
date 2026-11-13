@@ -65,7 +65,7 @@ def grid_cell(lat: float, lon: float) -> tuple[float, float]:
 
 def _urllib_fetch(url: str, timeout_s: float) -> bytes:
     request = urllib.request.Request(
-        url, headers={"Accept": "application/json", "User-Agent": "SmartRouteAI/0.1"}
+        url, headers={"Accept": "application/json", "User-Agent": "SmartRoute/0.1"}
     )
     with urllib.request.urlopen(request, timeout=timeout_s) as response:  # noqa: S310
         if response.status == 204:  # Weatherbit: brak danych dla lokalizacji

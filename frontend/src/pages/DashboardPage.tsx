@@ -212,7 +212,7 @@ export function DashboardPage() {
       </main>
 
       <footer className="mx-auto max-w-[90rem] px-4 pb-8 text-xs text-slate-500 sm:px-6 lg:px-8">
-        SmartRoute AI · dane: GTFS Static ZTM Gdańsk, Weatherbit Current · wartości szacunkowe
+        SmartRoute · dane: GTFS Static ZTM Gdańsk, Weatherbit Current · wartości szacunkowe
       </footer>
     </>
   );

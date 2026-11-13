@@ -73,7 +73,7 @@ export function describeError(error: unknown, context: ErrorContext): UserFacing
     case 'network':
       return {
         title: 'Brak połączenia z backendem',
-        message: 'Serwer SmartRoute AI nie odpowiada. Wprowadzone dane zostały zachowane.',
+        message: 'Serwer SmartRoute nie odpowiada. Wprowadzone dane zostały zachowane.',
         hints: [
           'Upewnij się, że backend działa (w katalogu projektu: .\\run.ps1).',
           'Backend powinien nasłuchiwać pod adresem http://127.0.0.1:8000.',

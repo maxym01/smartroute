@@ -16,7 +16,7 @@ def _isolate_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_default_settings() -> None:
     settings = Settings(_env_file=None)
 
-    assert settings.app_name == "SmartRoute AI"
+    assert settings.app_name == "SmartRoute"
     assert settings.environment == "development"
     assert settings.debug is False
     assert settings.database_url == "sqlite:///./smartroute.db"

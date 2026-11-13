@@ -20,7 +20,7 @@ export function Header({ backendStatus }: { backendStatus: BackendStatus }) {
           </span>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white">
-              SmartRoute <span className="text-accent-400">AI</span>
+              Smart<span className="text-accent-400">Route</span>
             </h1>
             <p className="text-xs text-slate-400 sm:text-sm">
               Porównaj samochód, komunikację miejską i rower — czas, koszt i emisję CO₂.

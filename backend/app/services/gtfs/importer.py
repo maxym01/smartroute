@@ -63,7 +63,7 @@ BATCH_SIZE = 10_000
 MAX_MEMBER_BYTES = 1024 * 1024 * 1024  # 1 GiB po rozpakowaniu na plik
 MAX_COMPRESSION_RATIO = 100
 MAX_WARNINGS = 20
-USER_AGENT = "SmartRouteAI-GTFS-Importer/0.1"
+USER_AGENT = "SmartRoute-GTFS-Importer/0.1"
 
 REQUIRED_COLUMNS: dict[str, tuple[str, ...]] = {
     "stops.txt": ("stop_id", "stop_name"),

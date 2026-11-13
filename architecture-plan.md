@@ -1,4 +1,4 @@
-# SmartRoute AI — plan architektury MVP
+# SmartRoute — plan architektury MVP
 
 Full-stack MVP do porównywania środków transportu (samochód, transport publiczny, rower) pod kątem czasu, kosztu i szacowanej emisji CO₂, z zapisywaniem podróży (pełny CRUD) i rekomendacją środka transportu na podstawie preferencji użytkownika.
 
@@ -17,6 +17,9 @@ Full-stack MVP do porównywania środków transportu (samochód, transport publi
 >   TanStack Query, react-hook-form, zod i MSW.
 > - Poza planem dodano rozkład GTFS Static ZTM Gdańsk (`/stops`, `/connections`) oraz
 >   opcjonalną pogodę bieżącą Weatherbit.
+> - W czasie powstawania planu projekt nazywał się „SmartRoute AI”. Obecna nazwa to
+>   „SmartRoute”. Rekomendację wyznacza deterministyczny algorytm oparty na regułach, a nie
+>   model AI. Katalog repozytorium i nazwy pakietów (`smartroute-ai`) pozostały bez zmian.
 
 ---
 

@@ -1,11 +1,13 @@
-# SmartRoute AI (dokumentacja w języku polskim)
+# SmartRoute (dokumentacja w języku polskim)
 
 > 🇬🇧 The main, up-to-date documentation is the English [README](../README.md). This is the full Polish version (more detail on UX decisions and the GTFS feed).
 
 Aplikacja full-stack (FastAPI + React) do porównywania środków transportu (samochód, komunikacja
 miejska, rower) pod kątem
 **czasu, kosztu i szacowanej emisji CO₂**, z zapisywaniem podróży i rekomendacją środka transportu
-według wybranego priorytetu.
+według wybranego priorytetu. Rekomendację wyznacza **deterministyczny algorytm wielokryterialny
+oparty na regułach**, a nie model uczenia maszynowego ani LLM. Te same dane wejściowe zawsze dają
+ten sam wynik.
 
 > **Status:** MVP: backend REST API oraz frontend React + TypeScript
 > ([szczegóły](#frontend-react--typescript)).
@@ -374,7 +376,7 @@ mają pierwszeństwo.
 
 | Zmienna         | Domyślnie                    | Opis                                       |
 |-----------------|------------------------------|--------------------------------------------|
-| `APP_NAME`      | `SmartRoute AI`              | Nazwa w Swagger UI i health check          |
+| `APP_NAME`      | `SmartRoute`                 | Nazwa w Swagger UI i health check          |
 | `ENVIRONMENT`   | `development`                | `development` / `test` / `production`      |
 | `DEBUG`         | `false`                      | Tryb debug FastAPI i logowanie SQL         |
 | `DATABASE_URL`  | `sqlite:///./smartroute.db`  | URL bazy; ścieżka względna liczona od `backend/` |
@@ -638,7 +640,8 @@ można nadpisać zmiennymi `TRANSPORT__*`:
 Samochód jest niedostępny przy `has_car=false`, a rower przy `allow_bike=false` lub powyżej 20 km.
 Niedostępne warianty są pokazywane z powodem i nigdy nie są rekomendowane.
 
-Algorytm ([`recommendation_service.py`](../backend/app/services/recommendation_service.py)):
+Algorytm ([`recommendation_service.py`](../backend/app/services/recommendation_service.py)) to zwykły
+kod oparty na regułach, bez uczenia maszynowego, LLM i danych treningowych:
 
 1. Pod uwagę brane są tylko dostępne warianty, z wartościami zaokrąglonymi tak, jak zwraca je API.
 2. `fastest`, `cheapest` i `greenest` porządkują warianty leksykograficznie: najpierw metryka

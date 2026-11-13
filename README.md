@@ -1,8 +1,10 @@
-# SmartRoute AI
+# SmartRoute
 
-SmartRoute AI is a full-stack web application (FastAPI + React) that compares **car**, **public
+SmartRoute is a full-stack web application (FastAPI + React) that compares **car**, **public
 transport** and **bike** for a trip in Gdańsk by **travel time, cost and estimated CO₂ emissions**,
 and recommends one option for the priority you choose (fastest, cheapest, greenest or balanced).
+The recommendation comes from a **deterministic, rule-based multi-criteria algorithm**, not from
+a machine learning model or an LLM. The same input always gives the same result.
 
 - Public transport times come from the **official GTFS Static timetable of ZTM Gdańsk** when a
   direct connection exists. These are scheduled times, without live delays. Otherwise the app
@@ -228,7 +230,7 @@ over `.env`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `APP_NAME` | `SmartRoute AI` | Name shown in Swagger UI and the health check |
+| `APP_NAME` | `SmartRoute` | Name shown in Swagger UI and the health check |
 | `ENVIRONMENT` | `development` | `development` / `test` / `production` |
 | `DEBUG` | `false` | FastAPI debug mode and SQL logging |
 | `DATABASE_URL` | `sqlite:///./smartroute.db` | Trips database (relative to `backend/`) |
@@ -363,7 +365,8 @@ all overridable via `TRANSPORT__*`:
 The car is unavailable with `has_car=false` and the bike with `allow_bike=false` or above 20 km.
 Unavailable options are shown with the reason and never recommended.
 
-**Recommendation** ([`backend/app/services/recommendation_service.py`](backend/app/services/recommendation_service.py)):
+**Recommendation** ([`backend/app/services/recommendation_service.py`](backend/app/services/recommendation_service.py)).
+This is plain, rule-based code with no machine learning, no LLM and no training data:
 
 1. Only available options are considered. Values are compared as returned by the API (rounded).
 2. `fastest`, `cheapest` and `greenest` order the options lexicographically by the main metric,

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Uruchamia backend SmartRoute AI (FastAPI + Uvicorn) z interpretera w .venv.
+    Uruchamia backend SmartRoute (FastAPI + Uvicorn) z interpretera w .venv.
 
 .DESCRIPTION
     Katalogiem roboczym procesu jest backend\, dzięki czemu:
@@ -56,7 +56,7 @@ if (-not $NoReload) {
     $uvicornArgs += @('--reload', '--reload-dir', 'app')
 }
 
-Write-Host "SmartRoute AI backend:  http://${BindHost}:$Port" -ForegroundColor Cyan
+Write-Host "SmartRoute backend:     http://${BindHost}:$Port" -ForegroundColor Cyan
 Write-Host "Swagger UI:             http://${BindHost}:$Port/docs" -ForegroundColor Cyan
 Write-Host 'Zatrzymanie: Ctrl+C' -ForegroundColor DarkGray
 

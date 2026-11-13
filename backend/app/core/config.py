@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     transport: TransportSettings = Field(default_factory=TransportSettings)
 
-    app_name: str = "SmartRoute AI"
+    app_name: str = "SmartRoute"
     app_version: str = "0.1.0"
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False

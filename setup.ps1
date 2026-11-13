@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Przygotowuje lokalne środowisko backendu SmartRoute AI (Windows, Python 3.12).
+    Przygotowuje lokalne środowisko backendu SmartRoute (Windows, Python 3.12).
 
 .DESCRIPTION
     1. Tworzy środowisko wirtualne .venv w katalogu głównym repozytorium (jeśli nie istnieje).
