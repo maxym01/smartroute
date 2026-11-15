@@ -25,6 +25,7 @@ ten sam wynik.
 - [Wymagania](#wymagania)
 - [Szybki start (Windows)](#szybki-start-windows)
 - [Uruchomienie aplikacji](#uruchomienie-aplikacji)
+- [Docker Compose](#docker-compose)
 - [Frontend (React + TypeScript)](#frontend-react--typescript)
 - [Konfiguracja](#konfiguracja)
 - [Baza danych](#baza-danych)
@@ -190,6 +191,53 @@ npm run dev
 | http://127.0.0.1:8000/redoc            | ReDoc                  |
 | http://127.0.0.1:8000/openapi.json     | Specyfikacja OpenAPI   |
 | http://127.0.0.1:8000/api/v1/health    | Health check           |
+
+## Docker Compose
+
+Alternatywa dla `setup.ps1`/`run.ps1`, niewymagająca lokalnego Pythona ani Node.js. Potrzebny jest
+Docker z Compose v2.24+ (na Windows/macOS: Docker Desktop).
+
+```powershell
+# Opcjonalnie: sekrety i ustawienia (np. WEATHERBIT_API_KEY) są czytane z backend/.env przy uruchomieniu
+Copy-Item backend\.env.example backend\.env
+
+docker compose up -d --build      # backend http://localhost:8000, frontend http://localhost:5173
+docker compose ps                 # oba serwisy powinny przejść w stan "healthy"
+
+# Rozkład GTFS: osobny, jednorazowy krok (aplikacja nie importuje go przy starcie)
+docker compose run --rm backend python -m app.cli.gtfs import
+docker compose run --rm backend python -m app.cli.gtfs info
+
+docker compose logs -f backend    # logi
+docker compose down               # zatrzymanie; dane w wolumenie zostają
+```
+
+| Serwis     | Obraz                                                 | Adres na hoście                                     | Uwagi                                     |
+|------------|-------------------------------------------------------|-----------------------------------------------------|-------------------------------------------|
+| `backend`  | `backend/Dockerfile` (Python 3.12 slim, bez roota)    | http://localhost:8000 (`/docs`, `/api/v1/health`)   | Uvicorn na `0.0.0.0:8000` w kontenerze    |
+| `frontend` | `frontend/Dockerfile` (build Vite → nginx, bez roota) | http://localhost:5173                               | nginx przekazuje `/api` do `backend:8000` |
+
+- **Sekrety:** `backend/.env` jest wykluczony z obu obrazów (`.dockerignore`) i trafia do backendu
+  wyłącznie w czasie uruchomienia przez `env_file` (opcjonalnie — bez pliku działają wartości
+  domyślne). Nie udostępniaj wyniku `docker compose config` (bez `--quiet`) ani `docker inspect`,
+  bo pokazują wartości zmiennych.
+- **Dane:** obie bazy SQLite (`smartroute.db`, `gtfs.db`) leżą w nazwanym wolumenie
+  `smartroute_smartroute-data` montowanym jako `/data`. `DATABASE_URL` i `GTFS_DATABASE_URL` są
+  ustawione w `compose.yaml` i mają pierwszeństwo przed `backend/.env`. Wolumen przetrwa
+  `docker compose down` i przebudowę obrazów; usuwa go dopiero `docker compose down -v`. Lokalne
+  pliki `backend/*.db` używane przez `run.ps1` nie są montowane ani modyfikowane.
+- **GTFS:** backend startuje bez rozkładu (`/stops` i `/connections` zwracają 503 do czasu
+  importu). Ponowny import podmienia rozkład w jednej transakcji, a API w tym czasie serwuje
+  poprzedni. Import z lokalnego ZIP-a zamiast pobierania:
+  `docker compose run --rm -v "./feed.zip:/tmp/feed.zip:ro" backend python -m app.cli.gtfs import --source /tmp/feed.zip`.
+  Można też wykorzystać już zaimportowaną lokalną bazę (tylko gdy w wolumenie nie ma jeszcze
+  `gtfs.db`; plik na hoście jest tylko odczytywany): `docker compose cp backend/gtfs.db backend:/data/gtfs.db`.
+- **Healthchecki:** backend sprawdza `GET /api/v1/health` (status `ok`), frontend — czy nginx
+  serwuje stronę. Frontend startuje dopiero, gdy backend jest zdrowy.
+- **Porty** są publikowane tylko na `127.0.0.1`. CORS nie jest potrzebny: przeglądarka komunikuje
+  się z jednym originem (`localhost:5173`), a nginx przekazuje `/api` dalej.
+- **Testy w kontenerze:** `docker build --target test -t smartroute-backend:test backend`,
+  a następnie `docker run --rm smartroute-backend:test`.
 
 ## Frontend (React + TypeScript)
 

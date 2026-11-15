@@ -1,0 +1,33 @@
+# Secrets - passed only at run time (env_file / environment in compose.yaml)
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases - data lives in the /data volume
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Python caches and build artifacts
+**/__pycache__
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+.coverage.*
+htmlcov/
+
+# GTFS downloads
+*.zip
+data/
+
+# Docker
+Dockerfile
+.dockerignore

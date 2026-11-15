@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+
+# Local env files could bake VITE_* values into the build
+.env
+.env.*
+!.env.example
+
+*.log
+Dockerfile
+.dockerignore

@@ -1,0 +1,51 @@
+# SmartRoute - backend (FastAPI) + frontend (React/Vite build served by nginx).
+#
+#   docker compose up -d --build
+#   backend:  http://localhost:8000  (Swagger UI: /docs)
+#   frontend: http://localhost:5173  (/api is proxied to the backend)
+#
+# GTFS timetable (separate, one-off step - the application does not import it on start):
+#   docker compose run --rm backend python -m app.cli.gtfs import
+
+name: smartroute
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    image: smartroute-backend:local
+    # Secrets (e.g. WEATHERBIT_API_KEY) are read at run time from backend/.env if it exists;
+    # the file is never copied into the image. Optional - without it the defaults apply.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    # "environment" takes precedence over env_file: databases always live in the volume,
+    # even if backend/.env holds local relative paths.
+    environment:
+      DATABASE_URL: sqlite:////data/smartroute.db
+      GTFS_DATABASE_URL: sqlite:////data/gtfs.db
+    volumes:
+      - smartroute-data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runtime
+    image: smartroute-frontend:local
+    environment:
+      BACKEND_UPSTREAM: backend:8000
+    ports:
+      - "127.0.0.1:5173:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  # SQLite: smartroute.db (trips) and gtfs.db (timetable). Survives "docker compose down";
+  # removed only by "docker compose down -v".
+  smartroute-data:

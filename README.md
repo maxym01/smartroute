@@ -201,6 +201,53 @@ Without an imported timetable, the API still works: comparisons use the estimate
 and `/connections` return `503 gtfs_not_imported`. The UI requires stop selection, though, so
 import the timetable before using the dashboard.
 
+### Docker Compose
+
+Requires Docker with Compose v2.24+ (Docker Desktop on Windows/macOS). No local Python or Node.js
+needed.
+
+```bash
+# Optional: secrets and settings (e.g. WEATHERBIT_API_KEY) are read from backend/.env at run time
+cp backend/.env.example backend/.env
+
+docker compose up -d --build      # backend http://localhost:8000, frontend http://localhost:5173
+docker compose ps                 # both services should become "healthy"
+
+# Timetable: a separate, one-off step (the app never imports it on start)
+docker compose run --rm backend python -m app.cli.gtfs import
+docker compose run --rm backend python -m app.cli.gtfs info
+
+docker compose logs -f backend    # logs
+docker compose down               # stop; data in the volume is kept
+```
+
+| Service | Image | Host address | Notes |
+|---|---|---|---|
+| `backend` | `backend/Dockerfile` (Python 3.12 slim, non-root) | http://localhost:8000 (`/docs`, `/api/v1/health`) | Uvicorn on `0.0.0.0:8000` in the container |
+| `frontend` | `frontend/Dockerfile` (Vite build → nginx, non-root) | http://localhost:5173 | nginx proxies `/api` to `backend:8000` |
+
+- **Secrets:** `backend/.env` is excluded from both images (`.dockerignore`) and passed to the
+  backend only at run time through `env_file` (optional — without it the defaults apply). Do not
+  share the output of `docker compose config` (without `--quiet`) or `docker inspect`, as they show
+  the values.
+- **Data:** both SQLite databases (`smartroute.db`, `gtfs.db`) live in the named volume
+  `smartroute_smartroute-data` mounted at `/data`. `DATABASE_URL` and `GTFS_DATABASE_URL` are set
+  in `compose.yaml` and take precedence over `backend/.env`. The volume survives
+  `docker compose down` and rebuilds; only `docker compose down -v` removes it. The local
+  `backend/*.db` files used by `run.ps1` are not mounted or modified.
+- **GTFS:** the backend starts without a timetable (`/stops` and `/connections` return 503 until it
+  is imported). Re-importing replaces the timetable in one transaction while the API keeps
+  serving the old one. To import a local ZIP instead of downloading:
+  `docker compose run --rm -v "./feed.zip:/tmp/feed.zip:ro" backend python -m app.cli.gtfs import --source /tmp/feed.zip`.
+  To reuse an already imported local database instead (only when the volume has no `gtfs.db` yet;
+  the host file is only read): `docker compose cp backend/gtfs.db backend:/data/gtfs.db`.
+- **Healthchecks:** the backend checks `GET /api/v1/health` (status `ok`), the frontend checks that
+  nginx serves the page. The frontend starts once the backend is healthy.
+- **Ports** are published on `127.0.0.1` only. CORS is not involved: the browser talks to a single
+  origin (`localhost:5173`) and nginx forwards `/api`.
+- **Tests in a container:** `docker build --target test -t smartroute-backend:test backend` and
+  `docker run --rm smartroute-backend:test`.
+
 ### Manual setup (macOS / Linux / without scripts)
 
 ```bash
@@ -475,10 +522,11 @@ described in [`docs/README.pl.md`](docs/README.pl.md#ręczna-weryfikacja-układu
 ```
 smartroute-ai/
 ├── setup.ps1 · run.ps1 · import-gtfs.ps1   # Windows helper scripts
+├── compose.yaml                            # Docker Compose: backend + frontend + data volume
 ├── architecture-plan.md                    # original planning document (Polish, historical)
 ├── docs/README.pl.md                       # detailed Polish documentation
 ├── backend/
-│   ├── pyproject.toml · requirements-lock.txt · .env.example
+│   ├── pyproject.toml · requirements-lock.txt · .env.example · Dockerfile
 │   ├── app/
 │   │   ├── main.py                         # app factory, CORS, lifespan, routers
 │   │   ├── api/v1/                         # endpoints: meta (health), trips, comparisons, gtfs
@@ -494,7 +542,7 @@ smartroute-ai/
 │   │       └── recommendation_service.py
 │   └── tests/ (unit/, api/)
 └── frontend/
-    ├── vite.config.ts · eslint.config.js · .env.example
+    ├── vite.config.ts · eslint.config.js · .env.example · Dockerfile · nginx.conf
     └── src/
         ├── pages/DashboardPage.tsx         # layout and flow orchestration
         ├── components/                     # TripForm, StopPicker, VariantCard, RecommendationPanel,
