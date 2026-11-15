@@ -1,4 +1,5 @@
-# Przypięte wersje zależności (constraints) zweryfikowane na Pythonie 3.12 / Windows.
+# Przypięte wersje zależności (constraints) zweryfikowane na Pythonie 3.12 / Windows
+# oraz 3.13 i 3.14 / Linux (same gotowe wheels, pip check, pełne testy).
 # Źródłem prawdy o zależnościach pozostaje pyproject.toml; ten plik tylko zamraża wersje.
 # Użycie: python -m pip install -e ".[dev]" -c requirements-lock.txt
 # Odświeżenie: python -m pip freeze --exclude-editable > requirements-lock.txt (i przywróć nagłówek).

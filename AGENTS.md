@@ -23,7 +23,7 @@ a parametric estimate. See [`README.md`](README.md) for the full description.
 
 | Path | Contents |
 |---|---|
-| `backend/` | FastAPI app (Python 3.12), package `app`, tests in `backend/tests` |
+| `backend/` | FastAPI app (Python 3.12; 3.13 and 3.14 also tested), package `app`, tests in `backend/tests` |
 | `frontend/` | React + TypeScript + Vite + Tailwind CSS 4 single-page dashboard |
 | `compose.yaml`, `*/Dockerfile` | Docker Compose setup (backend + nginx-served frontend) |
 | `setup.ps1`, `run.ps1`, `import-gtfs.ps1` | Windows helper scripts (setup, run both servers, GTFS import) |

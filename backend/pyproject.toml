@@ -6,7 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "smartroute-ai-backend"
 version = "0.1.0"
 description = "SmartRoute — porównanie środków transportu (czas, koszt, CO2) i rekomendacje"
-requires-python = ">=3.12,<3.13"
+# Tested on 3.12 (Windows, Docker) and on 3.13 / 3.14 (Linux, pinned dependencies). The upper
+# bound covers only verified versions; raise it after running the test suite on a newer one.
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.30",

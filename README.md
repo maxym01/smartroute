@@ -137,7 +137,7 @@ The features shown in the recording:
 
 | Area | Technologies |
 |---|---|
-| Backend | Python 3.12, FastAPI, Uvicorn, SQLAlchemy 2.0, Pydantic v2, pydantic-settings |
+| Backend | Python 3.12 (also tested on 3.13 and 3.14), FastAPI, Uvicorn, SQLAlchemy 2.0, Pydantic v2, pydantic-settings |
 | Database | SQLite (WAL mode for the timetable database) |
 | Timetable | GTFS Static, parsed with the standard library (`csv`, `zipfile`, `zoneinfo` + `tzdata`) |
 | Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, Lucide React |
@@ -153,7 +153,13 @@ which `setup.ps1` applies as a constraints file. Frontend versions are pinned in
 
 ### Requirements
 
-- **Python 3.12.x** (`pyproject.toml` requires `>=3.12,<3.13`)
+- **Python 3.12, 3.13 or 3.14** (`pyproject.toml` requires `>=3.12,<3.15`). Python 3.12 is
+  the primary version: `setup.ps1` and the Docker image use it, and it is tested on Windows.
+  Python 3.13 and 3.14 were verified on Linux (`python:3.13-slim` and `python:3.14-slim`):
+  all dependencies from `requirements-lock.txt` install as prebuilt wheels, `pip check`
+  passes, and the full backend test suite and Ruff pass. They have not been tested on Windows,
+  and `setup.ps1` still requires 3.12; on 3.13 or 3.14 use the
+  [manual setup](#manual-setup-macos--linux--without-scripts).
 - **Node.js ≥ 22.12** with npm (required by Vite 8), for the frontend only
 - Git and internet access for the first installation (PyPI, npm) and the GTFS download
 
