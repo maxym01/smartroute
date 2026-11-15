@@ -451,8 +451,14 @@ This is plain, rule-based code with no machine learning, no LLM and no training 
 2. `fastest`, `cheapest` and `greenest` order the options lexicographically by the main metric,
    then the remaining ones (e.g. fastest: time → cost → CO₂). If the main metric is tied, the
    explanation says which secondary metric decided.
-3. `balanced` applies min-max normalisation per metric (0 = best, 1 = worst) and scores
-   `1/3·time + 1/3·cost + 1/3·CO₂`. The lowest score wins.
+3. `balanced` divides each metric by its largest value among the available options
+   (0 = zero value, 1 = worst) and scores `1/3·time + 1/3·cost + 1/3·CO₂`. The lowest score
+   wins. Scaling by the maximum keeps the size of the differences: an option that is 135 min
+   slower and only 0.02 PLN cheaper no longer wins just by being better on two of three
+   metrics, as it did with the earlier min-max normalisation. The scale still depends on the
+   options compared, so removing an option can, in rare cases, change the order of the others.
+   A cost-based model (value of time and a CO₂ price) would remove that dependency, but it
+   needs agreed parameter values.
 4. A complete tie is resolved by the fixed order bike → public transport → car
    (`scoring.tie_break_order`), so the result is always deterministic.
 5. The weather comfort rule described above is applied as a separate, explicit step.
@@ -552,7 +558,7 @@ Automated tests (jsdom) do not check visual layout. Before a presentation, check
 
 ## Code review
 
-Quality was checked in three ways:
+Quality was checked in the following ways:
 
 - **Automated tests and static checks:** pytest, Ruff, Vitest, TypeScript and ESLint (results
   below).
@@ -566,6 +572,8 @@ Quality was checked in three ways:
   interface in the browser (layout problems found this way led to a UI redesign), a manual
   test after the audit fixes, and the manual Weatherbit check described in
   [Weather integration](#weather-integration-weatherbit).
+- **External code review** of commit `7e791ba`: its finding about the `balanced` scoring was
+  reproduced and fixed (see below).
 
 This section summarizes only findings and fixes that can be traced in the Git history or
 reproduced with the commands above.
@@ -584,6 +592,30 @@ recommendation tie handling"):
 - Regression tests were added for `allow_bike=false`, the 20 km bike limit, the winner of each
   single-metric priority, the tie explanation, the "ex aequo" badges and the GTFS warning.
 
+**Fix of the `balanced` scoring** (commit "fix: scale balanced scores by maximum to respect
+magnitude of differences"), following an external code review of commit `7e791ba`:
+
+- *Finding (reproduced on the code before the fix):* min-max normalisation ignored the size of
+  the differences. With two options the scores were always 1/3 and 2/3, so the winner was the
+  option that was better on two of the three metrics. Example: public transport was
+  recommended as the "best compromise" against a car although it was 135 min slower and only
+  0.02 PLN cheaper. Removing the bike could also swap the order of car and public transport
+  (9.7 km, 1 passenger).
+- *Fix:* each metric is now divided by its largest value among the available options
+  (`x / max`) instead of min-max. Equal weights, the tie-break order, the comfort rule, the API
+  fields and the other priorities are unchanged.
+- *Tests:* regression tests for the 135-min example, for two-option scores, for the 9.7 km
+  scenario with and without the bike, and for a metric that is zero for every option. They fail
+  on the old formula and pass on the new one. A separate test pins the demo scenario
+  (Dworzec Główny 01 → Zaspa 01, 5.9 km, 1 passenger): the bike stays recommended with both
+  formulas; only the displayed score changes (e.g. 0.25 → 0.29 for the 20:29 departure).
+- *Limitations:* the scale still depends on the options being compared, so removing an option
+  can still change the order of the others. In a simulation of 1,120 scenarios (0.5–20 km,
+  1–4 passengers, several public transport times) this happened in 2 cases, down from 108 with
+  min-max. A fully independent score would need a cost-based model (value of time and a CO₂
+  price), which changes the recommendations noticeably and needs agreed parameter values; it
+  is not implemented.
+
 **Other improvements in the Git history:**
 
 - Product name unified to "SmartRoute" (`712a1e7`). Source comments and docstrings translated
@@ -599,8 +631,8 @@ recommendation tie handling"):
 
 | Check | Result |
 |---|---|
-| `pytest` (backend unit + API) | 315 passed |
-| `ruff check` / `ruff format --check` | passed / 74 files already formatted |
+| `pytest` (backend unit + API) | 326 passed |
+| `ruff check` / `ruff format --check` | passed / 75 files already formatted |
 | `npm test` (Vitest) | 50 passed (7 files) |
 | `npm run typecheck` / `npm run lint` | passed / passed |
 

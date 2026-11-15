@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from app.core.enums import DataSource, TransportMode, TripPriority
@@ -49,22 +51,89 @@ def test_each_priority_on_city_scenario(priority: TripPriority, expected: Transp
     assert recommender.recommend(CITY, priority).mode is expected
 
 
-def test_balanced_score_uses_min_max_normalisation_with_equal_weights() -> None:
+def test_balanced_score_scales_each_metric_by_its_maximum_with_equal_weights() -> None:
     rec = recommender.recommend(CITY, TripPriority.BALANCED)
     car, pt, bike = (rec.score_for(m) for m in (CAR, PT, BIKE))
 
-    # car: time 0, cost 1, CO₂ 1
-    assert (car.normalized_duration, car.normalized_cost, car.normalized_co2) == (0, 1, 1)
-    assert car.balanced_score == pytest.approx(2 / 3, abs=1e-4)
-    # pt: time (35.3-20)/(40-20), cost 4.40/4.55, CO₂ 0.5/1.7
-    assert pt.normalized_duration == pytest.approx(15.3 / 20, abs=1e-4)
+    # max values: time 40 (bike), cost 4.55 (car), CO₂ 1.7 (car)
+    # car: time 20/40, cost 1, CO₂ 1
+    assert (car.normalized_duration, car.normalized_cost, car.normalized_co2) == (0.5, 1, 1)
+    assert car.balanced_score == pytest.approx(2.5 / 3, abs=1e-4)
+    # pt: time 35.3/40, cost 4.40/4.55, CO₂ 0.5/1.7
+    assert pt.normalized_duration == pytest.approx(35.3 / 40, abs=1e-4)
     assert pt.normalized_cost == pytest.approx(4.40 / 4.55, abs=1e-4)
     assert pt.normalized_co2 == pytest.approx(0.5 / 1.7, abs=1e-4)
-    assert pt.balanced_score == pytest.approx((15.3 / 20 + 4.40 / 4.55 + 0.5 / 1.7) / 3, abs=1e-4)
-    # bike: time 1, the rest 0
+    assert pt.balanced_score == pytest.approx((35.3 / 40 + 4.40 / 4.55 + 0.5 / 1.7) / 3, abs=1e-4)
+    # bike: time 1, cost and CO₂ 0
+    assert (bike.normalized_duration, bike.normalized_cost, bike.normalized_co2) == (1, 0, 0)
     assert bike.balanced_score == pytest.approx(1 / 3, abs=1e-4)
-    assert [s.mode for s in rec.scores] == [BIKE, CAR, PT]
+    assert [s.mode for s in rec.scores] == [BIKE, PT, CAR]
     assert [s.rank for s in rec.scores] == [1, 2, 3]
+
+
+# --- balanced: regression tests for the min-max normalisation issue --------------------------
+
+
+def test_balanced_respects_magnitude_of_differences() -> None:
+    """135 min slower for 0.02 PLN less must not win just by being better on 2 of 3 metrics."""
+    options = [estimate(CAR, 15.0, 4.42, 0.51), estimate(PT, 150.0, 4.40, 0.15)]
+
+    rec = recommender.recommend(options, TripPriority.BALANCED)
+
+    assert rec.mode is CAR
+    assert not rec.explanation.startswith("Komunikacja miejska daje najlepszy kompromis")
+    assert rec.explanation.startswith("Samochód daje najlepszy kompromis")
+
+
+def test_balanced_two_options_scores_reflect_the_size_of_differences() -> None:
+    # Min-max always gave exactly 1/3 and 2/3 for two options, whatever the differences.
+    options = [estimate(CAR, 15.0, 4.42, 0.51), estimate(PT, 150.0, 4.40, 0.15)]
+
+    rec = recommender.recommend(options, TripPriority.BALANCED)
+    car, pt = rec.score_for(CAR), rec.score_for(PT)
+
+    assert car.balanced_score == pytest.approx((15 / 150 + 1 + 1) / 3, abs=1e-4)
+    assert pt.balanced_score == pytest.approx((1 + 4.40 / 4.42 + 0.15 / 0.51) / 3, abs=1e-4)
+    assert {car.balanced_score, pt.balanced_score}.isdisjoint({0.3333, 0.6667})
+
+
+@pytest.mark.parametrize("pt_duration", [None, 40.0, 60.0, 90.0])
+def test_balanced_car_vs_public_transport_order_survives_removing_bike(
+    pt_duration: float | None,
+) -> None:
+    """Scenario from the code review: 9.7 km, 1 passenger, real calculators.
+
+    With min-max, removing the bike swapped car and public transport. ``pt_duration`` stands
+    for a GTFS time that includes waiting for the departure (None = parametric estimate).
+    """
+    service = ComparisonService.from_settings(TransportSettings())
+    estimates = service.compare(TripInput(distance_km=9.7), TripPriority.BALANCED).estimates
+    if pt_duration is not None:
+        estimates = tuple(
+            replace(e, duration_min=pt_duration, data_source=DataSource.GTFS_SCHEDULE)
+            if e.mode is PT
+            else e
+            for e in estimates
+        )
+
+    with_bike = recommender.recommend(estimates, TripPriority.BALANCED)
+    without_bike = recommender.recommend(
+        [e for e in estimates if e.mode is not BIKE], TripPriority.BALANCED
+    )
+
+    order_with_bike = [s.mode for s in with_bike.scores if s.mode is not BIKE]
+    assert order_with_bike == [s.mode for s in without_bike.scores]
+
+
+def test_balanced_handles_metric_that_is_zero_for_every_option() -> None:
+    options = [estimate(BIKE, 30.0, 0.0, 0.0), estimate(PT, 25.0, 0.0, 0.0)]
+
+    rec = recommender.recommend(options, TripPriority.BALANCED)
+
+    assert rec.mode is PT
+    assert all(s.normalized_cost == 0 and s.normalized_co2 == 0 for s in rec.scores)
+    assert rec.score_for(BIKE).normalized_duration == 1
+    assert rec.score_for(PT).normalized_duration == pytest.approx(25 / 30, abs=1e-4)
 
 
 def test_fastest_picks_strictly_fastest_even_if_runner_up_is_much_cheaper() -> None:
@@ -186,7 +255,8 @@ def test_explanation_mentions_unavailable_modes_and_similar_values() -> None:
 
 
 def test_describe_method_documents_each_priority() -> None:
-    assert "min-max" in describe_method(TripPriority.BALANCED)
+    assert "dzielona przez największą wartość" in describe_method(TripPriority.BALANCED)
+    assert "min-max" not in describe_method(TripPriority.BALANCED)
     assert "czas → koszt → emisja CO₂" in describe_method(TripPriority.FASTEST)
     assert "koszt → czas" in describe_method(TripPriority.CHEAPEST)
     assert describe_method(TripPriority.GREENEST).startswith("Porządek leksykograficzny")

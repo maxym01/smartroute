@@ -32,9 +32,9 @@ DISCLAIMER = (
 
 class ModeScoreRead(BaseModel):
     rank: int = Field(description="Miejsce w rankingu dostępnych wariantów (1 = rekomendowany)")
-    normalized_duration: float = Field(description="Czas po normalizacji min-max (0 = najlepszy)")
-    normalized_cost: float = Field(description="Koszt po normalizacji min-max (0 = najlepszy)")
-    normalized_co2: float = Field(description="Emisja po normalizacji min-max (0 = najlepsza)")
+    normalized_duration: float = Field(description="Czas ÷ największy czas (1 = najgorszy)")
+    normalized_cost: float = Field(description="Koszt ÷ największy koszt (1 = najgorszy)")
+    normalized_co2: float = Field(description="Emisja ÷ największa emisja (1 = najgorsza)")
     balanced_score: float = Field(description="Wynik ważony 1/3 każdej metryki (0..1)")
     weather_demoted: bool = Field(
         default=False,

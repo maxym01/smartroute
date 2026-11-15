@@ -79,7 +79,8 @@ Do not install another Python version; use the existing `.venv`.
   `TransitTimeProvider` (GTFS when a direct trip exists, otherwise the parametric estimate).
   Every variant carries a `data_source` (`gtfs_schedule` or `parametric_estimate`).
 - Recommendation (`services/recommendation_service.py`): lexicographic order for single-metric
-  priorities, min–max normalisation with equal weights for `balanced`, fixed tie-break order.
+  priorities, scaling each metric by its maximum with equal weights for `balanced`, fixed
+  tie-break order.
   Results must stay deterministic; unavailable variants are never recommended.
 - Databases: SQLite. `smartroute.db` (trips) is created at startup (`create_all` plus the
   idempotent, additive `db/migrations.py`; there is no Alembic). `gtfs.db` is a separate file

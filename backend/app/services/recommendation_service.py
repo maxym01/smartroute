@@ -3,12 +3,17 @@
 Algorithm
 ---------
 1. Only ``available=True`` options are considered. Unavailable ones are never recommended.
-2. For each metric m ∈ {time, cost, CO₂}, min-max normalization is computed among the
-   available options::
+2. For each metric m ∈ {time, cost, CO₂}, the values are scaled by the largest value among
+   the available options::
 
-       norm_m(x) = (x - min_m) / (max_m - min_m)     (0 = best, 1 = worst)
+       norm_m(x) = x / max_m     (0 = zero value, 1 = the largest, i.e. worst, value)
 
-   When all values are equal (max = min, e.g. a single available option), norm_m = 0.
+   The score therefore reflects how large the differences are, not only which option is
+   better: an option 10× slower but 0.5% cheaper does not win just by "winning more metrics".
+   When max_m = 0 (e.g. zero cost for every option), norm_m = 0. A single available option
+   gets 0 for every metric (there is nothing to compare it with). The scale still depends on
+   the options being compared, so removing an option can, in rare cases, change the order of
+   the remaining ones.
 3. Single-criterion priorities (``fastest``, ``cheapest``, ``greenest``) order the options
    lexicographically: the main metric first, then the others as tie-breakers
    (fastest: time → cost → CO₂; cheapest: cost → time → CO₂; greenest: CO₂ → time → cost).
@@ -74,9 +79,9 @@ def describe_method(priority: TripPriority) -> str:
     tie = " → ".join(MODE_LABELS[mode].lower() for mode in TIE_BREAK_ORDER)
     if priority is TripPriority.BALANCED:
         return (
-            "Normalizacja min-max każdej metryki wśród dostępnych wariantów (0 = najlepszy, "
-            "1 = najgorszy), wynik = 1/3·czas + 1/3·koszt + 1/3·CO₂, wygrywa najniższy wynik. "
-            f"Remis: {tie}."
+            "Każda metryka dzielona przez największą wartość wśród dostępnych wariantów "
+            "(0 = wartość zerowa, 1 = najgorsza), wynik = 1/3·czas + 1/3·koszt + 1/3·CO₂, "
+            f"wygrywa najniższy wynik. Remis: {tie}."
         )
     order = " → ".join(_METRIC_NAMES[m] for m in LEXICOGRAPHIC_ORDER[priority])
     return f"Porządek leksykograficzny wśród dostępnych wariantów: {order}. Remis: {tie}."
@@ -111,12 +116,12 @@ class Recommendation:
         return next((score for score in self.scores if score.mode is mode), None)
 
 
-def _min_max(values: Sequence[float]) -> list[float]:
-    low, high = min(values), max(values)
-    spread = high - low
-    if spread == 0:
+def _scale_to_max(values: Sequence[float]) -> list[float]:
+    """Divide by the largest value: keeps the ratio between options (all values are ≥ 0)."""
+    high = max(values)
+    if len(values) == 1 or high == 0:
         return [0.0 for _ in values]
-    return [(value - low) / spread for value in values]
+    return [value / high for value in values]
 
 
 class RecommendationService:
@@ -177,7 +182,7 @@ class RecommendationService:
     def _normalize(candidates: Sequence[ModeEstimate]) -> dict[TransportMode, dict[Metric, float]]:
         result: dict[TransportMode, dict[Metric, float]] = {e.mode: {} for e in candidates}
         for metric in METRICS:
-            values = _min_max([metric_value(e, metric) for e in candidates])
+            values = _scale_to_max([metric_value(e, metric) for e in candidates])
             for estimate, value in zip(candidates, values, strict=True):
                 result[estimate.mode][metric] = value
         return result
