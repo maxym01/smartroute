@@ -5,7 +5,7 @@ Full-stack MVP do porównywania środków transportu (samochód, transport publi
 **Stack:** Python 3.12, FastAPI, SQLite, SQLAlchemy 2.0 · React, TypeScript, Tailwind CSS (Vite)
 
 > Status: archiwalny dokument planistyczny sprzed implementacji. Aktualny stan projektu opisuje
-> [README.md](README.md) (EN) oraz [docs/README.pl.md](docs/README.pl.md) (PL).
+> [README.md](README.md).
 >
 > Najważniejsze różnice między tym planem a implementacją:
 >

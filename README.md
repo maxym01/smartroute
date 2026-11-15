@@ -15,19 +15,34 @@ a machine learning model or an LLM. The same input always gives the same result.
   They are not traffic data, live fuel prices, official fares or measurements. The UI and the
   API label every value accordingly.
 
-> **Status:** working MVP. The user interface and API messages are in Polish. A more detailed
-> Polish version of this document is in [`docs/README.pl.md`](docs/README.pl.md). The project
+> **Status:** working MVP. The user interface and API messages are in Polish. The project
 > was built with substantial help from AI tools; see
 > [AI-assisted development](#ai-assisted-development).
 
 ## Demo
 
-> 🎬 **Demo recording:** _coming soon — link will be added here._
->
-> <!-- Replace with e.g. [![Demo](docs/demo-thumbnail.png)](https://...) -->
+> 🎬 **Demo recording:** [`demo/SmartRoute_demo.mp4`](demo/SmartRoute_demo.mp4) — see
+> [Video demonstration](#video-demonstration) for what it shows.
+
+## Video demonstration
+
+The recording [`demo/SmartRoute_demo.mp4`](demo/SmartRoute_demo.mp4) (MP4, ~37 MB) walks
+through SmartRoute in six scenes using the running application. Download the file to watch it
+if your browser does not play it inline.
+
+The features shown in the recording:
+
+- planning a trip in the dashboard: GTFS stop search, date and time, distance, passengers,
+  car / bike availability and priority,
+- comparing car, public transport and bike by time, cost and CO₂, with the recommendation and
+  its explanation,
+- GTFS timetable data (direct departures used in the comparison) versus the labelled estimate,
+- the current-weather adjustment of the bike option,
+- changing the priority for the same trip.
 
 ## Table of contents
 
+- [Video demonstration](#video-demonstration)
 - [Features](#features)
 - [What is real data and what is estimated](#what-is-real-data-and-what-is-estimated)
 - [Architecture](#architecture)
@@ -39,6 +54,7 @@ a machine learning model or an LLM. The same input always gives the same result.
 - [Comparison model and recommendation](#comparison-model-and-recommendation)
 - [API overview](#api-overview)
 - [Testing and code quality](#testing-and-code-quality)
+- [Code review](#code-review)
 - [Project structure](#project-structure)
 - [AI-assisted development](#ai-assisted-development)
 - [Known limitations](#known-limitations)
@@ -514,8 +530,71 @@ npm run build
   unavailable options, GTFS vs estimate labels, recommendation warnings, ties), formatting
   and the API client.
 
-Automated tests do not check visual layout. The manual check for 360 / 768 / 1024 / 1440 px is
-described in [`docs/README.pl.md`](docs/README.pl.md#ręczna-weryfikacja-układu).
+### Manual layout check
+
+Automated tests (jsdom) do not check visual layout. Before a presentation, check the widths
+360, 768, 1024 and 1440 px in the browser DevTools (device mode):
+
+1. No horizontal scroll bar. The date and time fields and the options bar fit in the viewport.
+2. Planner: 3 rows at 1440 px with the "Porównaj" (Compare) button on the right. At 360 px the
+   fields are in one column and the button is full width.
+3. Cards: 3 in a row at 1440 px, 2 + 1 at 768 and 1024 px, one column at 360 px. Names and
+   values do not wrap.
+4. A route without a direct trip (e.g. **Dworzec Główny 02 → Zaspa 01**): the public transport
+   card shows "Czas szacunkowy — brak potwierdzonego kursu GTFS" (estimated time, no confirmed
+   GTFS trip), and the panel shows an explanation and the "Zmień przystanki lub godzinę"
+   (change stops or time) button.
+5. A route with a direct trip (e.g. **Dworzec Główny 01 → Zaspa 01**): the card shows
+   "Czas z rozkładu GTFS" (time from the GTFS timetable), and in the panel one trip is marked
+   "użyty w porównaniu" (used in the comparison).
+6. Keyboard-only navigation: Tab, arrow keys in the stop list and the priority selector, Escape
+   closes the tooltip.
+
+## Code review
+
+The author has carried out a full, independent review of the codebase. AI tools assisted the
+review: Claude Code ran the automated checks and verified the changes listed below. This
+section summarizes only findings and fixes that can be traced in the Git history or reproduced
+with the commands above.
+
+**Fixes** (commit `e4f93ae`, "fix: improve GTFS fallback warnings and
+recommendation tie handling"):
+
+- The recommendation panel now warns when public transport is recommended on a parametric
+  estimate (no confirmed direct GTFS trip, transfers are not searched, no guarantee of a
+  connection). The variant stays ranked.
+- Variant card notes state that an estimated time is not a confirmed travel time.
+- "Best value" badges compare values at display precision and mark ties as "ex aequo" in the
+  cards and in the recommendation benefits.
+- The backend explanation states when a tie on the primary metric was decided by the next
+  criterion. The tie-break order shown in the UI comes from the API.
+- Regression tests were added for `allow_bike=false`, the 20 km bike limit, the winner of each
+  single-metric priority, the tie explanation, the "ex aequo" badges and the GTFS warning.
+
+**Other improvements in the Git history:**
+
+- Product name unified to "SmartRoute" (`712a1e7`). Source comments and docstrings translated
+  to English (`580120f`).
+- One-command start of backend and frontend with `run.ps1` (`7e791ba`).
+- Docker Compose setup (`effc8ef`). It was verified on Windows (Docker Desktop): both
+  containers become healthy, `GET /api/v1/health` responds directly and through the frontend
+  proxy, trip data and the GTFS database persist across `docker compose down` / `up`, `.env` is
+  not present in the image, the backend runs as a non-root user, and the backend test suite
+  passes inside the container.
+
+**Current results of the automated checks** (run on 2026-11-15):
+
+| Check | Result |
+|---|---|
+| `pytest` (backend unit + API) | 315 passed |
+| `ruff check` / `ruff format --check` | passed / 74 files already formatted |
+| `npm test` (Vitest) | 50 passed (7 files) |
+| `npm run typecheck` / `npm run lint` | passed / passed |
+
+**Not resolved:** the points listed in [Known limitations](#known-limitations) still apply.
+This includes the known `StarletteDeprecationWarning` from `TestClient`, the moderate
+`npm audit` advisories in dev-only lint dependencies, and the lack of CI and visual-layout
+tests.
 
 ## Project structure
 
@@ -524,7 +603,7 @@ smartroute-ai/
 ├── setup.ps1 · run.ps1 · import-gtfs.ps1   # Windows helper scripts
 ├── compose.yaml                            # Docker Compose: backend + frontend + data volume
 ├── architecture-plan.md                    # original planning document (Polish, historical)
-├── docs/README.pl.md                       # detailed Polish documentation
+├── demo/SmartRoute_demo.mp4                # video demonstration
 ├── backend/
 │   ├── pyproject.toml · requirements-lock.txt · .env.example · Dockerfile
 │   ├── app/
@@ -567,8 +646,9 @@ This project was built with substantial help from AI tools. The split of work wa
 - **Manual testing by the author:** selected endpoints were tested in Swagger UI, and the
   behaviour of the user interface was checked in the browser. The author also ran the manual
   Weatherbit check described in [Weather integration](#weather-integration-weatherbit).
-
-The author has **not yet carried out a full, independent review of the entire codebase**.
+- **Code review:** the author has carried out a full, independent review of the codebase.
+  Claude Code assisted the review by running the automated checks and verifying the changes;
+  see [Code review](#code-review).
 
 ## Known limitations
 
@@ -592,7 +672,8 @@ The author has **not yet carried out a full, independent review of the entire co
   Dark theme only. The UI is in Polish.
 - **Backend:** no authentication (single anonymous user), SQLite only, no Alembic migrations,
   PLN only, API messages in Polish.
-- **Tooling:** the helper scripts are Windows-only. There is no Docker and no CI. `npm audit`
+- **Tooling:** the helper scripts are Windows-only (Docker Compose works on any OS). There is no
+  CI. `npm audit`
   reports moderate advisories in dev-only lint dependencies. Tests emit a known
   `StarletteDeprecationWarning` about `httpx` in `TestClient`.
 
@@ -603,4 +684,4 @@ The author has **not yet carried out a full, independent review of the entire co
 - Nearest stops by coordinates and walking time
 - GTFS-Realtime delays as a separate, explicitly labelled data source
 - Scheduled timetable refresh; map integration for distance and route
-- Alembic migrations, Docker and CI
+- Alembic migrations and CI
