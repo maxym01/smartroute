@@ -552,10 +552,23 @@ Automated tests (jsdom) do not check visual layout. Before a presentation, check
 
 ## Code review
 
-The author has carried out a full, independent review of the codebase. AI tools assisted the
-review: Claude Code ran the automated checks and verified the changes listed below. This
-section summarizes only findings and fixes that can be traced in the Git history or reproduced
-with the commands above.
+Quality was checked in three ways:
+
+- **Automated tests and static checks:** pytest, Ruff, Vitest, TypeScript and ESLint (results
+  below).
+- **AI-assisted review:** Claude Code carried out a functional audit of the recommendation
+  engine and the GTFS fallback at the author's request. It covered each priority,
+  `has_car=false`, `allow_bike=false`, the 20 km bike limit, bad weather for the bike, ties, and
+  the missing-direct-trip case. This audit led to the fixes listed below. Claude Code also
+  checked the documentation against the implementation, and checked `.gitignore`, the `.env`
+  files and the Git history for exposed keys or local data before publication.
+- **Manual functional verification by the author:** selected endpoints in Swagger UI, the user
+  interface in the browser (layout problems found this way led to a UI redesign), a manual
+  test after the audit fixes, and the manual Weatherbit check described in
+  [Weather integration](#weather-integration-weatherbit).
+
+This section summarizes only findings and fixes that can be traced in the Git history or
+reproduced with the commands above.
 
 **Fixes** (commit `e4f93ae`, "fix: improve GTFS fallback warnings and
 recommendation tie handling"):
@@ -602,6 +615,7 @@ tests.
 smartroute-ai/
 ├── setup.ps1 · run.ps1 · import-gtfs.ps1   # Windows helper scripts
 ├── compose.yaml                            # Docker Compose: backend + frontend + data volume
+├── AGENTS.md · CLAUDE.md                   # instructions for AI coding agents
 ├── architecture-plan.md                    # original planning document (Polish, historical)
 ├── demo/SmartRoute_demo.mp4                # video demonstration
 ├── backend/
@@ -646,9 +660,14 @@ This project was built with substantial help from AI tools. The split of work wa
 - **Manual testing by the author:** selected endpoints were tested in Swagger UI, and the
   behaviour of the user interface was checked in the browser. The author also ran the manual
   Weatherbit check described in [Weather integration](#weather-integration-weatherbit).
-- **Code review:** the author has carried out a full, independent review of the codebase.
-  Claude Code assisted the review by running the automated checks and verifying the changes;
-  see [Code review](#code-review).
+- **Code review:** Claude Code carried out an AI-assisted functional audit (recommendation and
+  GTFS fallback) and documentation and secret-exposure checks, and the author manually tested
+  the resulting fixes; see [Code review](#code-review).
+- **Agent instructions:** during development, instructions were given to the agent in a
+  separate prompt for each stage, with `architecture-plan.md` as the reference. There was no
+  repository instruction file. [`AGENTS.md`](AGENTS.md) (loaded by Claude Code through
+  `CLAUDE.md`) was added after the MVP was finished. It collects the rules repeated in those
+  prompts for future work.
 
 ## Known limitations
 
